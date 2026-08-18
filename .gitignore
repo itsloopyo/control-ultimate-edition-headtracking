@@ -1,0 +1,59 @@
+# Build outputs
+build/
+bin/
+obj/
+release/
+dist/
+out/
+*.user
+*.suo
+
+# Game libs (referenced at build time, never committed)
+libs/
+
+# Pixi / IDE / Claude
+.pixi/
+.vs/
+.idea/
+.vscode/
+.claude/
+
+# Local notes / doctrine files (per AGENTS.md)
+.lab/
+.millhouse/
+AGENTS.md
+CLAUDE.md
+CLAUDE.local.md
+GEMINI.md
+NEXUS_MODS.md
+scratch/
+
+# Other AI tooling scaffolding (local/per-user only)
+.cursor/
+.cursorrules
+.aider*
+
+# Skills, agents, MCP server configs (local/per-user only)
+.skills/
+skills/
+.agents/
+agents/
+.mcp.json
+mcp.json
+*.mcp.json
+.mcp/
+mcp-servers/
+
+# CMake artifacts at root, just in case
+CMakeCache.txt
+CMakeFiles/
+
+# Install-time state marker (written into the game dir at runtime)
+.headtracking-state.json
+
+# Logs
+*.log
+
+# OS detritus
+Thumbs.db
+.DS_Store

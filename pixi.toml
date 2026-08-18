@@ -1,0 +1,49 @@
+[workspace]
+name = "control-ultimate-edition-head-tracking"
+version = "0.0.0"
+description = "Head tracking mod for Control: Ultimate Edition using the CameraUnlock shared library"
+license = "MIT"
+channels = ["conda-forge"]
+platforms = ["win-64"]
+
+[tasks]
+sync = { cmd = "git submodule update --remote cameraunlock-core" }
+
+# No -G: let CMake auto-detect the installed Visual Studio generator. Pinning
+# "Visual Studio 17 2022" broke on CI once the windows runner image moved to
+# VS 2026 (VS 17 absent); auto-detect picks whatever VS the machine has.
+setup = { cmd = """
+    powershell -Command "if (-not (Test-Path 'build')) { cmake -B build -A x64 } else { Write-Host 'Build directory exists, skipping setup' -ForegroundColor Yellow }"
+""" }
+
+build = { cmd = "cmake --build build --config Release", depends-on = ["setup"] }
+build-debug = { cmd = "cmake --build build --config Debug", depends-on = ["setup"] }
+
+clean = { cmd = """
+    powershell -Command "if (Test-Path 'build') { Remove-Item 'build' -Recurse -Force }; if (Test-Path 'bin') { Remove-Item 'bin' -Recurse -Force }; Write-Host 'Build artifacts cleaned' -ForegroundColor Green"
+""" }
+
+# Dev deploy: build, then copy bin/Release/*.asi straight to the detected
+# game install (install.cmd is the release-ZIP installer; it reads from a
+# staged plugins/ folder that only exists inside the packaged ZIP).
+deploy = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/deploy.ps1 Release", depends-on = ["build"] }
+install = { depends-on = ["deploy"] }
+# /y is not optional: uninstall.cmd ends in `pause` without it, and a pixi
+# task has no TTY, so the pause aborts the run. Extra args (a game path)
+# are appended by pixi and the arg parser is order-independent.
+uninstall = "scripts\\uninstall.cmd /y"
+
+# Manual vendored-loader refresh. CI does NOT run this. Commit the diff.
+update-deps = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/update-deps.ps1" }
+
+# Prints the installed game EXEs' PE fingerprints as a paste-ready build
+# profile. Run this first when a user reports the mod staying dormant, and as
+# step one of a rederive after a game patch.
+check-fingerprint = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/check-fingerprint.ps1" }
+
+# Build + package the installer ZIP (read by CI and release.ps1).
+package = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/package-release.ps1", depends-on = ["build"] }
+
+release = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/release.ps1" }
+
+[dependencies]

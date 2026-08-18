@@ -1,0 +1,15 @@
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.png binary
+*.jpg binary
+*.gif binary
+*.zip binary
+*.dll binary
+
+# Vendored third-party license texts are stored exactly as their authors
+# published them. Left out of the eol=lf normalisation above so the bytes we
+# redistribute are the bytes upstream wrote.
+extern/minhook/LICENSE.txt -text
+vendor/ultimate-asi-loader/LICENSE -text
