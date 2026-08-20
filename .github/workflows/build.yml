@@ -31,6 +31,10 @@ jobs:
 
       - name: Setup pixi
         uses: prefix-dev/setup-pixi@5185adfbffb4bd703da3010310260805d89ebb11 # v0.9.6
+        with:
+          # Task runner only - pixi.toml declares no packages, and setup-pixi's
+          # `pixi list --locked` step errors on an empty environment.
+          run-install: false
 
       - name: Build and package
         shell: pwsh
