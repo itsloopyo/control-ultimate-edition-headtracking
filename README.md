@@ -47,10 +47,10 @@ The Nexus ZIP does not bundle the ASI loader; you manage that yourself.
 1. Open OpenTrack.
 2. Set **Output** to **UDP over network**.
 3. Configure the UDP output to `127.0.0.1`, port `4242`.
-4. Start tracking, then sit in your normal playing position and hold still for a
-   moment. The mod recenters once, on the first pose you hold steady, so
-   whatever you are holding then becomes your centre. `Home` recenters again at
-   any time.
+4. Start tracking, then sit in your normal playing position and centre it in
+   your tracker app, so whatever you are holding then becomes your centre. The
+   mod keeps no centre of its own, it applies whatever the tracker sends, so
+   your tracker app is the only place to set or reset the centre.
 
 ### VR Headset Setup
 
@@ -75,7 +75,6 @@ Two equivalent binding sets - use whichever your keyboard has:
 
 | Action              | Nav-cluster | Chord           |
 |---------------------|-------------|-----------------|
-| Recenter            | `Home`      | `Ctrl+Shift+T`  |
 | Toggle tracking     | `End`       | `Ctrl+Shift+Y`  |
 | Cycle tracking mode | `Page Up`   | `Ctrl+Shift+G`  |
 | Toggle yaw mode     | `Page Down` | `Ctrl+Shift+H`  |
@@ -150,8 +149,7 @@ LimitZ = 0.40             ; meters forward
 LimitZBack = 0.10         ; meters back
 
 [Hotkeys]
-; Win32 Virtual Key codes. Defaults: Home, End, PageUp, PageDown.
-Recenter = 36
+; Win32 Virtual Key codes. Defaults: End, PageUp, PageDown.
 Toggle = 35
 TogglePosition = 33
 ToggleYawMode = 34
@@ -161,7 +159,7 @@ ToggleYawMode = 34
 
 **Mod not loading.**
 - Confirm `winmm.dll` and `ControlHeadTracking.asi` both sit next to `Control_DX12.exe`.
-- Check `HeadTracking.log` in the same directory for startup diagnostics.
+- Check `HeadTracking.log` in the same directory for startup diagnostics. It is rewritten from scratch on every launch; the previous launch is kept as `HeadTracking.prev.log`, which is the one to send if the game crashed and you have relaunched since.
 - Look for `Build profile ... matched` in the log. If it instead says the EXE is
   newer or older than any known build, the game has been patched and the mod has
   deliberately stayed dormant; check the releases page for an update.

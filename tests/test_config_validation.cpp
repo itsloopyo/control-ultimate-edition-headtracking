@@ -85,7 +85,7 @@ static void TestMissingFileKeepsDefaults() {
     CheckEq(cfg.yawSensitivity, 1.0f, "missing file keeps the default sensitivity");
     CheckEq(cfg.localSmoothing, 0.0f, "missing file keeps LocalSmoothing at 0");
     CheckEq(cfg.remoteSmoothing, 0.15f, "missing file keeps RemoteSmoothing at 0.15");
-    CheckEqInt(cfg.recenterKey, VK_HOME, "missing file keeps the default recenter key");
+    CheckEqInt(cfg.toggleKey, VK_END, "missing file keeps the default toggle key");
 }
 
 static void TestEmptyFileKeepsDefaults() {
@@ -168,26 +168,25 @@ static void TestFovScaleOffSwitchIsSeparateFromItsBand() {
 static void TestHotkeysMustBeVirtualKeyCodes() {
     Config cfg = LoadIni(
         "[Hotkeys]\n"
-        "Recenter=0\n"
         "Toggle=999\n"
         "TogglePosition=End\n"
         "ToggleYawMode=-5\n");
-    CheckEqInt(cfg.recenterKey, VK_HOME, "a zero hotkey falls back to the default");
     CheckEqInt(cfg.toggleKey, VK_END, "an out-of-range hotkey falls back to the default");
     CheckEqInt(cfg.togglePositionKey, VK_PRIOR,
                "a key NAME is not a VK code, so it falls back to the default");
     CheckEqInt(cfg.toggleYawModeKey, VK_NEXT, "a negative hotkey falls back to the default");
+
+    CheckEqInt(LoadIni("[Hotkeys]\nToggle=0\n").toggleKey, VK_END,
+               "a zero hotkey falls back to the default");
 }
 
 static void TestValidHotkeysAreKeptExactly() {
     Config cfg = LoadIni(
         "[Hotkeys]\n"
-        "Recenter=112\n"   // F1
         "Toggle=113\n"     // F2
         "TogglePosition=1\n"    // VK_LBUTTON, the bottom of the valid range
         "ToggleYawMode=254\n"); // the top of it
-    CheckEqInt(cfg.recenterKey, 112, "a valid VK code is passed through untouched");
-    CheckEqInt(cfg.toggleKey, 113, "and so is the next one");
+    CheckEqInt(cfg.toggleKey, 113, "a valid VK code is passed through untouched");
     CheckEqInt(cfg.togglePositionKey, 1, "the bottom of the valid range is accepted");
     CheckEqInt(cfg.toggleYawModeKey, 254, "the top of the valid range is accepted");
 }

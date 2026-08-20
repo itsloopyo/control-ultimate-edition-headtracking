@@ -49,6 +49,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The log now keeps one previous generation. Each launch renames the existing
+  `HeadTracking.log` to `HeadTracking.prev.log` before opening a fresh one, so
+  a crash report written on the way down survives the relaunch that follows it.
+  A rename that fails is reported in the fresh log, so a stale `.prev.log` is
+  never mistaken for the last session.
 - Changed pitch, roll and lateral lean to move the right way. All three ran
   backwards against a real tracker, and each is now negated once at the engine
   boundary rather than by flipping an `Invert*` default, so the INI toggles
@@ -77,6 +82,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the packet's source address and is re-evaluated when the source changes, so
   switching between a local OpenTrack instance and a phone takes effect without
   a restart.
+- Made the tracker the only place the centre lives. The in-game recenter, its
+  `Home` and `Ctrl+Shift+T` bindings and the `[Hotkeys] Recenter` setting are
+  gone. A centre inside the mod sat in series with the tracker's own and the
+  two drifted apart, because each side recentred at moments the other could
+  not see, and with the view off there was no way to tell which side was
+  wrong. The mod now applies the pose it is sent as-is; centre it in your
+  tracker app while sitting in your normal playing position.
 
 ### Removed
 

@@ -173,11 +173,6 @@ void Mod::SetEnabled(bool enabled) {
 
 void Mod::Toggle() { SetEnabled(!m_enabled.load()); }
 
-void Mod::Recenter() {
-    m_session.Recenter();
-    Log::Line("Recentered");
-}
-
 void Mod::CycleTrackingMode() {
     cameraunlock::TrackingMode next = m_session.CycleMode();
     static const char* kNames[] = {"rotation+position", "rotation only", "position only"};

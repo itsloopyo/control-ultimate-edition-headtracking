@@ -9,7 +9,20 @@
 #include <process.h>
 
 static unsigned __stdcall InitThread(void* /*unused*/) {
-    ControlHT::Log::Open(ControlHT::PathUtils::GetModPathW(ControlHT::LOG_FILENAME));
+    const std::wstring logPath =
+        ControlHT::PathUtils::GetModPathW(ControlHT::LOG_FILENAME);
+    const bool hadPriorLog = GetFileAttributesW(logPath.c_str()) != INVALID_FILE_ATTRIBUTES;
+    const bool rotated =
+        MoveFileExW(logPath.c_str(),
+                    ControlHT::PathUtils::GetModPathW(ControlHT::LOG_PREV_FILENAME).c_str(),
+                    MOVEFILE_REPLACE_EXISTING) != FALSE;
+    const DWORD rotateErr = GetLastError();
+    ControlHT::Log::Open(logPath);
+    if (hadPriorLog && !rotated) {
+        ControlHT::Log::Line("WARN: could not rotate the previous log to %s (error %lu) - "
+                             "that file is from an older session",
+                             ControlHT::LOG_PREV_FILENAME, rotateErr);
+    }
     cameraunlock::diagnostics::InstallCrashHandler();
     ControlHT::Log::Line(
         "Control Head Tracking v%s attached", ControlHT::CONTROLHT_VERSION);

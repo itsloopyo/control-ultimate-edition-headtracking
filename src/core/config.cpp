@@ -176,7 +176,6 @@ bool Config::LoadFromFile(const std::string& path) {
     limitZ = ReadFiniteFloat(ini, "Position", "LimitZ", limitZ, 0.0f, kMaxPositionLimitMeters);
     limitZBack = ReadFiniteFloat(ini, "Position", "LimitZBack", limitZBack, 0.0f, kMaxPositionLimitMeters);
 
-    recenterKey = ReadVirtualKey(ini, "Recenter", recenterKey);
     toggleKey = ReadVirtualKey(ini, "Toggle", toggleKey);
     togglePositionKey = ReadVirtualKey(ini, "TogglePosition", togglePositionKey);
     toggleYawModeKey = ReadVirtualKey(ini, "ToggleYawMode", toggleYawModeKey);
@@ -249,8 +248,7 @@ bool Config::SaveDefaultIfMissing(const std::string& path) const {
     w.WriteBlankLine();
 
     w.WriteSection("Hotkeys");
-    w.WriteComment("Defaults: Home=Recenter, End=Toggle, PgUp=TogglePosition, PgDn=ToggleYawMode.");
-    w.WriteInt("Recenter", recenterKey);
+    w.WriteComment("Defaults: End=Toggle, PgUp=TogglePosition, PgDn=ToggleYawMode.");
     w.WriteInt("Toggle", toggleKey);
     w.WriteInt("TogglePosition", togglePositionKey);
     w.WriteInt("ToggleYawMode", toggleYawModeKey);

@@ -62,7 +62,6 @@ struct Config {
     float limitZBack = 0.10f;
 
     // Hotkeys (Virtual Key codes). Nav cluster defaults per doctrine.
-    int recenterKey = VK_HOME;       // Home
     int toggleKey = VK_END;          // End
     int togglePositionKey = VK_PRIOR; // PgUp
     int toggleYawModeKey = VK_NEXT;   // PgDn
