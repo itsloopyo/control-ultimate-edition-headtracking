@@ -40,7 +40,8 @@ if (-not (Test-Path $vendorAsiDll)) {
 
 # Verbatim third-party license texts for everything compiled into the .asi.
 # THIRD-PARTY-NOTICES.md names each component, but BSD-2-Clause wants the
-# conditions and the disclaimer themselves, so the upstream files travel too.
+# conditions and the disclaimer themselves and MIT wants its own notice, so the
+# upstream files travel too.
 # Missing is fatal rather than skipped: a release that quietly drops these is
 # one that redistributes BSD code without its license.
 function Copy-VendoredLicenses {
@@ -50,6 +51,11 @@ function Copy-VendoredLicenses {
         # MinHook, and the Hacker Disassembler Engine it carries in src/hde -
         # one upstream file covers both.
         "minhook-LICENSE.txt" = Join-Path $projectDir "extern/minhook/LICENSE.txt"
+        # CameraUnlock Core is MIT under a different copyright holder from this
+        # mod's own LICENSE, and MIT wants its notice in every copy including a
+        # binary one, so it travels as its own file rather than being assumed
+        # covered by ours.
+        "cameraunlock-core-LICENSE.txt" = Join-Path $projectDir "cameraunlock-core/LICENSE"
     }
 
     $outDir = Join-Path $StagingDir "licenses"
@@ -102,10 +108,17 @@ Copy-Item $asi -Destination $pluginsDir -Force
 $vendorOut = Join-Path $ghStaging "vendor/ultimate-asi-loader"
 New-Item -ItemType Directory -Path $vendorOut -Force | Out-Null
 Copy-Item $vendorAsiDll -Destination $vendorOut -Force
-foreach ($f in @("LICENSE", "README.md")) {
-    $src = Join-Path $projectDir "vendor/ultimate-asi-loader/$f"
-    if (Test-Path $src) { Copy-Item $src -Destination $vendorOut -Force }
+# The loader binary is redistributed here, and MIT requires its notice to be in
+# every copy, so a missing LICENSE is fatal rather than skipped - the same rule
+# Copy-VendoredLicenses applies to what is compiled into the .asi. README.md is
+# only provenance for us, so it is copied when present.
+$vendorLicense = Join-Path $projectDir "vendor/ultimate-asi-loader/LICENSE"
+if (-not (Test-Path $vendorLicense)) {
+    throw "vendor/ultimate-asi-loader/LICENSE missing. dinput8.dll is redistributed in this ZIP and its MIT notice has to ship with it."
 }
+Copy-Item $vendorLicense -Destination $vendorOut -Force
+$vendorReadme = Join-Path $projectDir "vendor/ultimate-asi-loader/README.md"
+if (Test-Path $vendorReadme) { Copy-Item $vendorReadme -Destination $vendorOut -Force }
 
 foreach ($doc in @("README.md", "LICENSE", "CHANGELOG.md", "THIRD-PARTY-NOTICES.md")) {
     $src = Join-Path $projectDir $doc

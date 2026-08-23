@@ -72,11 +72,19 @@ installer ZIP and the Nexus ZIP, next to the `.asi` they are compiled into.
 
 ## CameraUnlock Core
 
-- **Version:** submodule `0e615e0`
+- **Version:** submodule `3465659`
 - **License:** MIT
 - **Upstream:** https://github.com/itsloopyo/cameraunlock-core
 - **Usage:** Built from source as a static library via git submodule.
 - **Bundled:** yes (compiled into the shipped `.asi`).
+
+Copyright (c) 2026 CameraUnlock
+
+MIT requires its copyright and permission notice to travel with every copy,
+including a binary one, so the upstream text ships as
+`licenses/cameraunlock-core-LICENSE.txt` in both release ZIPs next to the `.asi`
+it is compiled into. It is a different copyright holder from this mod's own
+LICENSE, which is why it gets its own file rather than being covered by it.
 
 ---
 
@@ -103,7 +111,15 @@ Control: Ultimate Edition is developed and published by Remedy Entertainment Plc
 and 505 Games. This mod is an unofficial modification, not affiliated with or
 endorsed by either party.
 
-No game code, assets, or data files are contained in this repository or in any
-release it produces. The mod is built entirely from our own source plus the
-permissively-licensed components listed above, and requires a legitimate copy of
-the game to do anything at all.
+No game code, extracted assets, or data files are contained in this repository
+or in any release it produces. The mod is built entirely from our own source
+plus the permissively-licensed components listed above, and requires a
+legitimate copy of the game to do anything at all.
+
+The one piece of game-derived material here is `assets/readme-clip.gif`, a
+ten-second clip captured while playing, shown in the README to demonstrate what
+the mod does. Copyright in the footage stays with Remedy Entertainment Plc and
+505 Games. It identifies the game this mod is for and shows the mod working,
+which is the customary use of gameplay footage on a mod page, and it ships in
+neither release ZIP. The names Control, Remedy Entertainment and 505 Games are
+likewise used only to say which game this mod is for.
