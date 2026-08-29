@@ -1,8 +1,8 @@
 # Control: Ultimate Edition Head Tracking
 
-![Mod GIF](https://raw.githubusercontent.com/itsloopyo/control-ultimate-edition-headtracking/main/assets/readme-clip.gif)
+![Control: Ultimate Edition running with this mod](https://raw.githubusercontent.com/itsloopyo/control-ultimate-edition-headtracking/main/assets/readme-clip.gif)
 
-Head tracking for Control: Ultimate Edition that lets your head movement steer the camera while your mouse or controller handles the aim, no VR headset required.
+An unofficial head tracking mod for Control: Ultimate Edition that moves the camera with your head while your mouse or controller keeps aiming, driven by a webcam, phone, or any OpenTrack compatible tracker, with no VR headset required.
 
 ## Features
 
