@@ -2,7 +2,7 @@
 
 ![Control: Ultimate Edition running with this mod](https://raw.githubusercontent.com/itsloopyo/control-ultimate-edition-headtracking/main/assets/readme-clip.gif)
 
-An unofficial head tracking mod for Control: Ultimate Edition that moves the camera with your head while your mouse or controller keeps aiming, driven by a webcam, phone, or any OpenTrack compatible tracker, with no VR headset required.
+An unofficial head tracking mod for Control: Ultimate Edition that moves the camera with your head while your mouse or controller keeps aiming, driven by OpenTrack over UDP, with no VR headset required.
 
 ## Features
 
@@ -12,7 +12,7 @@ An unofficial head tracking mod for Control: Ultimate Edition that moves the cam
 ## Requirements
 
 - [Control: Ultimate Edition on Steam](https://store.steampowered.com/app/870780/) (app `870780`). The standard edition is untested and may need a different game-detection entry.
-- A tracking source: [OpenTrack](https://github.com/opentrack/opentrack) with UDP output, or a phone tracker app that speaks the same protocol (SmoothTrack, HeadTrack, etc.).
+- A tracking source: [OpenTrack](https://github.com/opentrack/opentrack) with its UDP output, or a phone app that sends OpenTrack UDP pose data to port 4242.
 - Windows 10 or 11, 64-bit.
 
 ## Installation
@@ -44,30 +44,64 @@ The Nexus ZIP does not bundle the ASI loader; you manage that yourself.
 
 ## Setting Up OpenTrack
 
-1. Open OpenTrack.
-2. Set **Output** to **UDP over network**.
-3. Configure the UDP output to `127.0.0.1`, port `4242`.
-4. Start tracking, then sit in your normal playing position and centre it in
-   your tracker app, so whatever you are holding then becomes your centre. The
-   mod keeps no centre of its own, it applies whatever the tracker sends, so
-   your tracker app is the only place to set or reset the centre.
+The mod listens for OpenTrack pose data on UDP port `4242`, on every network
+interface. One datagram is six little-endian 64-bit floats in the order
+`x, y, z, yaw, pitch, roll`: position in centimetres, rotation in degrees, 48
+bytes in total. Anything that sends that to that port drives the view.
+OpenTrack's **UDP over network** output sends exactly this, and the steps below
+set it up.
 
-### VR Headset Setup
+1. Install [OpenTrack](https://github.com/opentrack/opentrack/releases).
+2. Pick a tracker under **Input**, using the notes below.
+3. Set **Output** to **UDP over network**, host `127.0.0.1`, port `4242`.
+4. Press **Start**. Tracking and the game can start in either order.
 
-1. Connect your headset to the PC over Air Link or Virtual Desktop and start SteamVR.
-2. In OpenTrack, set **Input** to **SteamVR**.
-3. Set **Output** to **UDP over network** at `127.0.0.1:4242` as above.
+### Webcam
 
-### Webcam Setup
+OpenTrack ships a `neuralnet tracker` input that reads a plain webcam. Select it
+under **Input**, pick your camera in its settings, and use the output settings
+above. How well it tracks depends on your camera and your lighting, so try it
+before buying anything.
 
-1. In OpenTrack, set **Input** to the **neuralnet tracker**.
-2. Pick your webcam and follow OpenTrack's calibration.
-3. Set **Output** to **UDP over network** at `127.0.0.1:4242`.
+### Phone
 
-### Phone App Setup
+A phone app can reach the mod directly, with no OpenTrack on the PC, if it sends
+the datagram described above. Point it at this PC's IP address (run `ipconfig`
+to find it) on port `4242`. Not every phone tracker speaks this protocol, so
+check yours for an OpenTrack or UDP output option first. [Headcam](https://headcam.app)
+sends it, and I wrote it so decent tracking is free for anyone who already owns
+a phone.
 
-- If your phone app already smooths its output, point it directly at the PC running the mod on port `4242`.
-- If you want OpenTrack's curve mapping and filtering, send from the phone into OpenTrack instead, then have OpenTrack output UDP to `127.0.0.1:4242`.
+Sending direct works when the app filters its own signal on the device. The
+mod's smoothing is sized to take the edge off a clean signal rather than to
+rescue a noisy one, so a raw feed sent direct will jitter. If it does, point the
+app at OpenTrack's **UDP over network** *input* on some other port, say 5252,
+and let OpenTrack's filters and curves clean it up before its output forwards to
+`127.0.0.1:4242`.
+
+Anything arriving from outside `127.0.0.0/8` counts as a remote connection and
+is smoothed with `RemoteSmoothing` rather than `LocalSmoothing`. That includes a
+tracker on this very PC that sends to the machine's own LAN address, because the
+mod reads the source address and not the machine.
+
+### Headset or other hardware
+
+If your device has an OpenTrack input driver, select it under **Input** and use
+the same output settings. OpenTrack's own **Input** list is the authority on
+what it can read; the mod only ever sees what OpenTrack sends.
+
+### Centring
+
+Centring belongs to your tracker. The mod subtracts no centre of its own: it
+applies the pose it receives exactly as it arrives, so a stream of zeros holds
+the view where the game itself puts it. Press the centre control in your tracker
+(OpenTrack's **Center** bind, or the CENTER button in Headcam) and the tracker
+zeroes its own output, which leaves the view centred with the mod doing nothing.
+
+That is why there is no centre hotkey here and nothing to re-centre in game. Two
+centres in series would drift apart, because each side re-centres at moments the
+other cannot see, and you would end up pressing twice to centre once. If the
+view sits off to one side, centre it in the tracker.
 
 ## Controls
 
@@ -209,9 +243,9 @@ Output: `bin/Release/ControlHeadTracking.asi`.
 
 ## Community & Support
 
-- [Discord](https://discord.com/invite/dxyZdyFNT9) - setup help, bug reports, and new-release announcements
-- [Lopari](https://lopari.app) - free Windows launcher with one-click install and launch of head-tracking mods
-- [Headcam](https://headcam.app) - free app that turns your phone into a head tracker
+- Discord: [Loop's Head Tracking Hangout](https://discord.com/invite/dxyZdyFNT9) - setup help, bug reports, and new-release announcements
+- [Lopari](https://lopari.app) - free Windows launcher with one-click install and launch for the released head-tracking mods
+- [Headcam](https://headcam.app) - free app that turns your iPhone or Android phone into the head tracker
 
 ## License
 
