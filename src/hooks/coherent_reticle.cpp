@@ -49,9 +49,13 @@ ExecuteScriptFn g_origExecuteScript = nullptr;
 // driving this element by CSS transform swung the real crosshair a quarter of the
 // screen width with nothing else moving.
 //
-// The whole body is wrapped in try/catch because there is no JS-to-C++ channel
-// here: an exception inside the shim would look from outside exactly like "the
-// offset is not being applied", and it must never escape into the game's own UI.
+// The body is deliberately NOT wrapped in try/catch. There is no JS-to-C++ channel
+// here, so a catch has nowhere to report to, and a swallowed exception looks from
+// outside exactly like "the offset is not being applied" - the same silent failure
+// the heartbeat below had to be added to cure. Letting it throw puts it in
+// Coherent's own JS error reporting, which is the only place it can be seen at all.
+// Finding no crosshair is the normal state and is handled by `if(!e.length)return`,
+// not by a catch, so nothing routine reaches that path.
 //
 // The shim CALIBRATES ITSELF rather than trusting any theory about coordinate
 // spaces. It nudges the element 100px, measures how far its bounding box actually
@@ -73,18 +77,17 @@ ExecuteScriptFn g_origExecuteScript = nullptr;
 // we replaced it. The original is captured once per element, because reading it
 // back after we have written to it would compound our own offset.
 constexpr const char* kReticleShim =
-    "window.__ht=function(x,y,v){try{var w=window,d=document;if(!d.body)return;var e=w.__hte;"
-    "if(!e||!e.length||!e[0].isConnected){e=[];var a=d.querySelectorAll('*');for(var i=0;i<a."
-    "length;i++){var t=a[i];if(!/cross.?hair|retic|ammo/i.test((t.id||'')+' '+String(t.classN"
-    "ame||'')))continue;var r=t.getBoundingClientRect();if(!r.width||!r.height)continue;var i"
-    "nside=false;for(var j=0;j<e.length;j++){if(e[j].contains(t)||t.contains(e[j])){inside=tr"
-    "ue;break;}}if(inside)continue;e.push(t);}w.__hte=e;for(var k=0;k<e.length;k++){var g=e[k"
-    "];var b=w.getComputedStyle(g).transform;g.__b=(!b||b==='none')?'':b;var q0=g.getBounding"
-    "ClientRect().left;g.style.transform=g.__b+' translate(100px,0px)';var q1=g.getBoundingCl"
-    "ientRect().left;g.style.transform=g.__b;var m=(q1-q0)/100;g.__g=(m>0.01)?1/m:1;}}if(!e.l"
-    "ength)return;for(var n=0;n<e.length;n++){var el=e[n];el.style.transform=el.__b+' transla"
-    "te('+(x*w.innerWidth*0.5*el.__g)+'px,'+(-y*w.innerHeight*0.5*el.__g)+'px)';el.style.visi"
-    "bility=v?'':'hidden';}}catch(err){}};";
+    "window.__ht=function(x,y,v){var w=window,d=document;if(!d.body)return;var e=w.__hte;if(!e|"
+    "|!e.length||!e[0].isConnected){e=[];var a=d.querySelectorAll('*');for(var i=0;i<a.length;i"
+    "++){var t=a[i];if(!/cross.?hair|retic|ammo/i.test((t.id||'')+' '+String(t.className||'')))"
+    "continue;var r=t.getBoundingClientRect();if(!r.width||!r.height)continue;var inside=false;"
+    "for(var j=0;j<e.length;j++){if(e[j].contains(t)||t.contains(e[j])){inside=true;break;}}if("
+    "inside)continue;e.push(t);}w.__hte=e;for(var k=0;k<e.length;k++){var g=e[k];var b=w.getCom"
+    "putedStyle(g).transform;g.__b=(!b||b==='none')?'':b;var q0=g.getBoundingClientRect().left;"
+    "g.style.transform=g.__b+' translate(100px,0px)';var q1=g.getBoundingClientRect().left;g.st"
+    "yle.transform=g.__b;var m=(q1-q0)/100;g.__g=(m>0.01)?1/m:1;}}if(!e.length)return;for(var n"
+    "=0;n<e.length;n++){var el=e[n];el.style.transform=el.__b+' translate('+(x*w.innerWidth*0.5"
+    "*el.__g)+'px,'+(-y*w.innerHeight*0.5*el.__g)+'px)';el.style.visibility=v?'':'hidden';}};";
 
 // Hooked purely for its trampoline: `g_origExecuteScript` is how the shim and
 // every later offset are pushed into a View. The detour itself has nothing to
