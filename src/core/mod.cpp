@@ -44,7 +44,12 @@ void Mod::ApplyConfigToSession() {
     pos.sensitivity_y = m_config.positionSensitivityY;
     pos.sensitivity_z = m_config.positionSensitivityZ;
     pos.limit_x = m_config.limitX;
+    // The clamp is [-limit_y_down, +limit_y] and limit_y_down carries its own
+    // default, so mirror the one configured vertical limit the way
+    // PositionSettings::Symmetric does. Left unset, raising LimitY widened the
+    // upward budget only and downward travel stayed pinned at 0.20m.
     pos.limit_y = m_config.limitY;
+    pos.limit_y_down = m_config.limitY;
     pos.limit_z = m_config.limitZ;
     pos.limit_z_back = m_config.limitZBack;
     m_session.GetPositionProcessor().SetSettings(pos);
