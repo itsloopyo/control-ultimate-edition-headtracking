@@ -54,10 +54,11 @@ if ($Version -eq 'nightly') {
     exit $LASTEXITCODE
 }
 
-$constantsFile = Join-Path $ProjectRoot "src\core\constants.h"
-$cmakeFile     = Join-Path $ProjectRoot "CMakeLists.txt"
-$changelogFile = Join-Path $ProjectRoot "CHANGELOG.md"
-$manifestFile  = Join-Path $ProjectRoot "launcher-manifest.json"
+$constantsFile  = Join-Path $ProjectRoot "src\core\constants.h"
+$cmakeFile      = Join-Path $ProjectRoot "CMakeLists.txt"
+$changelogFile  = Join-Path $ProjectRoot "CHANGELOG.md"
+$manifestFile   = Join-Path $ProjectRoot "launcher-manifest.json"
+$installCmdFile = Join-Path $ProjectRoot "scripts\install.cmd"
 
 $currentVersionMatch = Select-String -Path $constantsFile -Pattern 'CONTROLHT_VERSION\s*=\s*"([^"]+)"'
 if (-not $currentVersionMatch) {
@@ -137,6 +138,14 @@ $manifestContent = $manifestContent -replace '("version":\s*")\d+\.\d+\.\d+(")',
 Set-Content -Path $manifestFile -Value $manifestContent -NoNewline
 Write-Host "  Updated launcher-manifest.json -> $Version" -ForegroundColor Green
 
+# install.cmd's MOD_VERSION is what the install writes into the launcher's
+# state file, which is where the launcher looks to spot a stale install.
+$installCmdContent = Get-Content $installCmdFile -Raw
+if ($installCmdContent -notmatch 'set "MOD_VERSION=[^"]+"') { throw "MOD_VERSION line not found in $installCmdFile" }
+$installCmdContent = $installCmdContent -replace 'set "MOD_VERSION=[^"]+"', "set `"MOD_VERSION=$Version`""
+Set-Content -Path $installCmdFile -Value $installCmdContent -NoNewline
+Write-Host "  Updated install.cmd -> $Version" -ForegroundColor Green
+
 Write-Host "Building release..." -ForegroundColor Cyan
 & pixi run build
 if ($LASTEXITCODE -ne 0) { Write-Error "Build failed"; exit 1 }
@@ -148,7 +157,7 @@ if ($LASTEXITCODE -ne 0) { Write-Error "Packaging failed"; exit 1 }
 Push-Location $ProjectRoot
 try {
     Write-Host "Committing version bump..." -ForegroundColor Cyan
-    git add $constantsFile $cmakeFile $manifestFile $changelogFile
+    git add $constantsFile $cmakeFile $manifestFile $installCmdFile $changelogFile
     git commit -m "Release v$Version"
     if ($LASTEXITCODE -ne 0) { Write-Error "Commit failed"; exit 1 }
 
