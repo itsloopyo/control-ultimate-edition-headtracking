@@ -2,6 +2,9 @@
 
 #include "constants.h"
 
+#include <cameraunlock/data/position_settings.h>
+#include <cameraunlock/math/smoothing_utils.h>
+
 #include <string>
 
 namespace ControlHT {
@@ -44,8 +47,8 @@ struct Config {
     // machine is already steady, so localSmoothing is 0.0 and nothing floors
     // it; a phone on WiFi jitters over the network, which is what
     // remoteSmoothing is for.
-    float localSmoothing = 0.0f;
-    float remoteSmoothing = 0.15f;
+    float localSmoothing = static_cast<float>(cameraunlock::math::kDefaultLocalSmoothing);
+    float remoteSmoothing = static_cast<float>(cameraunlock::math::kDefaultRemoteSmoothing);
 
     // Deadzone (degrees)
     float yawDeadzone = 0.0f;
@@ -56,10 +59,10 @@ struct Config {
     float positionSensitivityX = 1.0f;
     float positionSensitivityY = 1.0f;
     float positionSensitivityZ = 1.0f;
-    float limitX = 0.30f;
-    float limitY = 0.20f;
-    float limitZ = 0.40f;
-    float limitZBack = 0.10f;
+    float limitX = cameraunlock::PositionSettings{}.limit_x;
+    float limitY = cameraunlock::PositionSettings{}.limit_y;
+    float limitZ = cameraunlock::PositionSettings{}.limit_z;
+    float limitZBack = cameraunlock::PositionSettings{}.limit_z_back;
 
     // Hotkeys (Virtual Key codes). Nav cluster defaults per doctrine.
     int toggleKey = VK_END;          // End
