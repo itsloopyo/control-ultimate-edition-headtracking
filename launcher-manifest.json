@@ -6,22 +6,11 @@
     "game_id": "control-ultimate-edition"
   },
   "strategy": "AsiLoader",
-
-  "_comment_delivery_mode": "install_cmd, not manifest. The launcher's native deploy engine provisions a loader only by extracting a zip; Ultimate ASI Loader ships here as a single raw DLL that has to be copied and renamed to the proxy the game loads. That is not expressible in manifest mode today, so install.cmd stays authoritative and the blocks below are descriptive, for the launcher to ingest and audit.",
-  "delivery_mode": "install_cmd",
-  "install_script": "install.cmd",
-  "uninstall_script": "uninstall.cmd",
-
-  "_comment_loader": "archives and detect are both empty on purpose. Empty archives with a NON-empty detect is the shape the deploy engine fails fast on - it declares a loader the package cannot provision - and the ASI loader is described in files[] below instead, which is where a single renamed DLL belongs.",
-  "loader": {
-    "archives": [],
-    "detect": [],
-    "seed": []
-  },
+  "delivery_mode": "manifest",
 
   "files": [
-    { "source": "vendor/ultimate-asi-loader/dinput8.dll", "target": "winmm.dll" },
-    { "source": "plugins/ControlHeadTracking.asi", "target": "ControlHeadTracking.asi" }
+    { "source": "vendor/ultimate-asi-loader/dinput8.dll", "target": "winmm.dll", "anchor": "exe_dir", "backup": true },
+    { "source": "plugins/ControlHeadTracking.asi", "target": "ControlHeadTracking.asi", "anchor": "exe_dir" }
   ],
 
   "runtime_requirements": [],
