@@ -8,6 +8,7 @@ An unofficial head tracking mod for Control: Ultimate Edition that moves the cam
 
 - **Decoupled look and aim** - head movement steers the camera; aim stays on your mouse or controller
 - **6DOF positional tracking** - lean and peek by moving your head, horizon-locked so leaning forward travels along the ground
+- **Works with any OpenTrack compatible tracker** - free options available for PC, iOS and Android
 
 ## Requirements
 
@@ -16,6 +17,13 @@ An unofficial head tracking mod for Control: Ultimate Edition that moves the cam
 - Windows 10 or 11, 64-bit.
 
 ## Installation
+
+### Lopari
+
+Download [Lopari](https://lopari.app), choose **Control: Ultimate Edition**, and click
+**Play with head tracking**.
+
+### Standalone Installer
 
 1. Download the latest `ControlHeadTracking-v<version>-installer.zip` from the [Releases](https://github.com/itsloopyo/control-ultimate-edition-headtracking/releases) page.
 2. Extract the ZIP anywhere.
