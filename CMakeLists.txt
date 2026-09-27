@@ -111,6 +111,19 @@ if(BUILD_TESTING)
     target_link_libraries(test_config_validation PRIVATE cameraunlock)
     add_test(NAME config_validation COMMAND test_config_validation)
 
+    # CameraUnlock.ini: the committed file, a first launch, Defaults.ini and the
+    # toggles' saves. Also the renderer behind `pixi run render-config`
+    # (--render-config <path>).
+    add_executable(test_config
+        tests/config_tests.cpp
+        src/core/config.cpp
+        src/legacy_config/legacy_config.cpp)
+    set_target_properties(test_config PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+    target_include_directories(test_config PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_compile_definitions(test_config PRIVATE CONTROL_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(test_config PRIVATE cameraunlock)
+    add_test(NAME config COMMAND test_config)
+
     # Exercises the real socket path: holds the port, starts the receiver,
     # frees the port, and times how long the supervisor takes to reclaim it.
     add_executable(test_udp_port_reclaim tests/test_udp_port_reclaim.cpp)
@@ -121,7 +134,8 @@ if(BUILD_TESTING)
 
     # The canonical config conversion's differential test: the dev
     # pre-release's reader (byte copies in tests/config_differential/oracle/src)
-    # and startup code against the frozen reader in src/legacy_config/. The
+    # and startup code against the frozen reader in src/legacy_config/, and that
+    # reader against the config owner's migration into CameraUnlock.ini. The
     # oracle is its own library so its pch.h and constants.h never meet the
     # mod's.
     set(CONTROL_DIFFERENTIAL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tests/config_differential)
@@ -132,6 +146,7 @@ if(BUILD_TESTING)
 
     add_executable(control_config_differential
         ${CONTROL_DIFFERENTIAL_DIR}/differential_tests.cpp
+        src/core/config.cpp
         src/legacy_config/legacy_config.cpp)
     set_target_properties(control_config_differential PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
     target_include_directories(control_config_differential PRIVATE
@@ -141,6 +156,13 @@ if(BUILD_TESTING)
         CONTROL_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(control_config_differential PRIVATE control_config_oracle cameraunlock)
     add_test(NAME config_differential COMMAND control_config_differential)
+
+    # Core's canonical config lint over the committed file and every file the
+    # differential test migrated, which it writes beside itself under migrated\.
+    add_test(NAME config_lint COMMAND node
+        ${CONTROL_DIFFERENTIAL_DIR}/lint-migrated.mjs
+        $<TARGET_FILE_DIR:control_config_differential>/migrated)
+    set_tests_properties(config_lint PROPERTIES DEPENDS config_differential)
 
     # What the differential test compiles is pinned by hash, line endings aside:
     # the oracle's byte copies must stay the dev build's (git show

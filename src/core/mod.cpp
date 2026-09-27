@@ -7,7 +7,6 @@
 #include "hooks/engine_camera_hook.h"
 #include "hooks/coherent_reticle.h"
 #include "hooks/fov_override.h"
-#include "legacy_config/legacy_config.h"
 
 #include <cameraunlock/hooks/hook_manager.h>
 
@@ -19,38 +18,16 @@ Mod& Mod::Instance() {
 }
 
 // Maps the loaded config onto the tracking pipeline, so there is one place to
-// look when a rotation, position or smoothing setting does not appear to be
-// taking effect. The keys that configure something outside the pipeline - the
-// UDP port, the FOV override - are applied where that thing is started.
+// look when a position or smoothing setting does not appear to be taking
+// effect. The keys that configure something outside the pipeline - the UDP
+// port, the FOV override - are applied where that thing is started. The
+// processors keep their identity sensitivity, inversion and deadzone: the
+// tracker shapes the pose.
 void Mod::ApplyConfigToSession() {
-    cameraunlock::TrackingProcessor& processor = m_session.GetProcessor();
-
-    cameraunlock::SensitivitySettings sens;
-    sens.yaw = m_config.yawSensitivity;
-    sens.pitch = m_config.pitchSensitivity;
-    sens.roll = m_config.rollSensitivity;
-    sens.invert_yaw = m_config.invertYaw;
-    sens.invert_pitch = m_config.invertPitch;
-    sens.invert_roll = m_config.invertRoll;
-    processor.SetSensitivity(sens);
-
-    cameraunlock::DeadzoneSettings dz;
-    dz.yaw = m_config.yawDeadzone;
-    dz.pitch = m_config.pitchDeadzone;
-    dz.roll = m_config.rollDeadzone;
-    processor.SetDeadzone(dz);
-
     cameraunlock::PositionSettings pos;
-    pos.sensitivity_x = m_config.positionSensitivityX;
-    pos.sensitivity_y = m_config.positionSensitivityY;
-    pos.sensitivity_z = m_config.positionSensitivityZ;
     pos.limit_x = m_config.limitX;
-    // The clamp is [-limit_y_down, +limit_y] and limit_y_down carries its own
-    // default, so mirror the one configured vertical limit the way
-    // PositionSettings::Symmetric does. Left unset, raising LimitY widened the
-    // upward budget only and downward travel stayed pinned at 0.20m.
     pos.limit_y = m_config.limitY;
-    pos.limit_y_down = m_config.limitY;
+    pos.limit_y_down = m_config.limitYDown;
     pos.limit_z = m_config.limitZ;
     pos.limit_z_back = m_config.limitZBack;
     m_session.GetPositionProcessor().SetSettings(pos);
@@ -62,9 +39,7 @@ void Mod::ApplyConfigToSession() {
     m_session.SetLocalSmoothing(m_config.localSmoothing);
     m_session.SetRemoteSmoothing(m_config.remoteSmoothing);
 
-    if (!m_config.positionEnabled) {
-        m_session.SetMode(cameraunlock::TrackingMode::RotationOnly);
-    }
+    m_session.SetMode(config::StartupTrackingMode(m_config));
 
     m_worldLockedYaw.store(m_config.worldSpaceYaw);
 }
@@ -122,38 +97,8 @@ void Mod::Shutdown() {
     m_initialized.store(false);
 }
 
-bool Mod::LoadConfig() {
-    std::string path = PathUtils::GetModDirectory() + "\\" + CONFIG_FILENAME;
-    m_config.SaveDefaultIfMissing(path);
-    legacy::Config read;
-    const bool present = legacy::Load(path, read);
-    m_config.udpPort = read.udpPort;
-    m_config.enableOnStartup = read.enableOnStartup;
-    m_config.positionEnabled = read.positionEnabled;
-    m_config.worldSpaceYaw = read.worldSpaceYaw;
-    m_config.fovScale = read.fovScale;
-    m_config.yawSensitivity = read.yawSensitivity;
-    m_config.pitchSensitivity = read.pitchSensitivity;
-    m_config.rollSensitivity = read.rollSensitivity;
-    m_config.invertYaw = read.invertYaw;
-    m_config.invertPitch = read.invertPitch;
-    m_config.invertRoll = read.invertRoll;
-    m_config.localSmoothing = read.localSmoothing;
-    m_config.remoteSmoothing = read.remoteSmoothing;
-    m_config.yawDeadzone = read.yawDeadzone;
-    m_config.pitchDeadzone = read.pitchDeadzone;
-    m_config.rollDeadzone = read.rollDeadzone;
-    m_config.positionSensitivityX = read.positionSensitivityX;
-    m_config.positionSensitivityY = read.positionSensitivityY;
-    m_config.positionSensitivityZ = read.positionSensitivityZ;
-    m_config.limitX = read.limitX;
-    m_config.limitY = read.limitY;
-    m_config.limitZ = read.limitZ;
-    m_config.limitZBack = read.limitZBack;
-    m_config.toggleKey = read.toggleKey;
-    m_config.togglePositionKey = read.togglePositionKey;
-    m_config.toggleYawModeKey = read.toggleYawModeKey;
-    return present;
+void Mod::LoadConfig() {
+    m_config = config::Load(PathUtils::GetModDirectoryW(), cameraunlock::config::DefaultsFile::PerUser());
 }
 
 bool Mod::InitializeHooks() {
@@ -169,7 +114,14 @@ bool Mod::InitializeHooks() {
 
     // Before the camera hook goes live, because the detour is what re-applies
     // it: the override has to be configured by the time the first tick lands.
-    ConfigureFovOverride(m_config.fovScale);
+    // The file takes 0 to 2.0; the narrowest multiplier the mod writes is 0.5.
+    float fovScale = m_config.fovScale;
+    if (fovScale > 0.0f && fovScale < kMinFovScale) {
+        Log::Line("WARN: [Camera] FovScale=%g is below %g, using %g", static_cast<double>(fovScale),
+                  static_cast<double>(kMinFovScale), static_cast<double>(kMinFovScale));
+        fovScale = kMinFovScale;
+    }
+    ConfigureFovOverride(fovScale);
 
     m_cameraHookInstalled = InstallEngineCameraHook();
     if (!m_cameraHookInstalled) {
@@ -207,16 +159,19 @@ void Mod::SetEnabled(bool enabled) {
 
 void Mod::Toggle() { SetEnabled(!m_enabled.load()); }
 
+// Both run on the hotkey poller's thread, apply the new value, then save it.
 void Mod::CycleTrackingMode() {
     cameraunlock::TrackingMode next = m_session.CycleMode();
     static const char* kNames[] = {"rotation+position", "rotation only", "position only"};
     Log::Line("Tracking mode: %s", kNames[static_cast<int>(next)]);
+    config::SaveTrackingMode(next);
 }
 
 void Mod::ToggleYawMode() {
     bool next = !m_worldLockedYaw.load();
     m_worldLockedYaw.store(next);
     Log::Line("Yaw mode: %s", next ? "world-locked" : "camera-local");
+    config::SaveWorldSpaceYaw(next);
 }
 
 // The session re-reads the receiver's source-address check every update, so a

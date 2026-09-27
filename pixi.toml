@@ -42,23 +42,32 @@ update-deps = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/update-d
 # step one of a rederive after a game patch.
 check-fingerprint = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/check-fingerprint.ps1" }
 
-# The behaviour tests, the frozen HeadTracking.ini reader's tests and the
-# config differential test, which holds that reader to the dev pre-release's.
-# Needs no game install.
+# The behaviour tests, the CameraUnlock.ini tests, the frozen HeadTracking.ini
+# reader's tests, the config differential test, which holds that reader to the
+# dev pre-release's and the migration into CameraUnlock.ini to that reader, and
+# core's canonical config lint over every file that test migrated (run with
+# node). Needs no game install.
 test = { cmd = "ctest --test-dir build -C Release --output-on-failure", depends-on = ["build"] }
+
+# Rewrites CameraUnlock.ini, the committed config, from the config table after a
+# change to a row, a comment or a default, then the launcher manifest's config
+# descriptor per_game from it. test_config fails until it has run.
+render-config = { cmd = "build/Release/test_config.exe --render-config CameraUnlock.ini && node cameraunlock-core/scripts/encode-seed.mjs", depends-on = ["build"] }
 
 # Build, test and package the installer ZIP (read by CI and release.ps1). Gated
 # on `test`, so a release never ships without the behaviour locks.
 package = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/package-release.ps1", depends-on = ["test"] }
 
 # Checks the newest release/*-installer.zip's launcher-manifest.json against the
-# files in the ZIP. Run it after package.
+# files in the ZIP, and that it carries neither CameraUnlock.ini nor
+# HeadTracking.ini. Run it after package.
 validate-manifest = "node cameraunlock-core/scripts/validate-manifest.mjs"
 
 release = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/release.ps1" }
 
 [dependencies]
-# CMake and Visual Studio come from the system. Node runs validate-manifest and
-# core's config descriptor check in packaging (Copy-SharedBundle). Pinned to the
+# CMake and Visual Studio come from the system. Node runs the canonical config
+# lint in `test`, render-config's encode-seed step, validate-manifest and core's
+# config descriptor check in packaging (Copy-SharedBundle). Pinned to the
 # release core's own lock resolves.
 nodejs = "==26.5.0"

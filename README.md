@@ -128,74 +128,110 @@ Two equivalent binding sets - use whichever your keyboard has:
 3. Rotational tracking disabled, positional tracking enabled.
 4. Back to normal.
 
+The tracking mode and the yaw mode are saved to `CameraUnlock.ini` when you
+change them, and the game starts in them next time. `End` turns head tracking
+on or off for this session only; `EnableOnStartup` says whether it is on when
+the game starts. Every key is set in `[Hotkeys]` and can be changed or removed.
+
 ## Configuration
 
-The mod writes `HeadTracking.ini` next to `Control_DX12.exe` on first launch.
-Edit it and restart the game to apply changes. Hotkey values are Win32
-Virtual Key codes in decimal.
+<!-- cameraunlock:config -->
+The mod reads its settings from `CameraUnlock.ini` in the game folder, and creates the file when it starts and finds none. Edit it with any text editor.
 
-A comment has to sit on its own line, above the key. The parser hands the whole
-text after `=` to the value reader. For a `true`/`false` or text setting that
-text is compared as a whole, so a trailing `; note` makes the comparison fail
-and the setting silently keeps its default. Numeric settings survive a trailing
-comment because the number is read off the front of the text, which is why some
-lines below still carry one. Putting every comment on its own line always works.
+A setting set to `default` takes its value from `Defaults.ini`, which every head tracking mod that keeps its settings in `CameraUnlock.ini` reads. Head tracking mods that keep their settings in another file do not read it. Writing a value in place of `default` changes that setting for this game only. When the mod saves a setting that a hotkey changed in game, it writes the new value in place of `default`, so that setting no longer follows `Defaults.ini` in this game until you set it to `default` again.
+
+`Defaults.ini` is `%AppData%\CameraUnlock\Defaults.ini` on Windows; `$XDG_CONFIG_HOME/CameraUnlock/Defaults.ini` on Linux, or `~/.config/CameraUnlock/Defaults.ini` where `XDG_CONFIG_HOME` is not set, under Wine and Proton too; and `~/Library/Application Support/CameraUnlock/Defaults.ini` on macOS. The mod's log, where it writes one, names the file it read.
+
+When the mod starts and finds no `Defaults.ini`, it creates one holding the built-in values, unless Windows runs the game as a packaged app. The mod never changes `Defaults.ini` after that. Edit it with any text editor.
+
+The built-in value of each setting set to `default` below:
+
+- `UdpPort=4242`
+- `EnableOnStartup=true`
+- `WorldSpaceYaw=true`
+- `RotationEnabled=true`
+- `LocalSmoothing=0.0`
+- `RemoteSmoothing=0.15`
+- `PositionEnabled=true`
+- `PositionLimitX=0.3`
+- `PositionLimitY=0.2`
+- `PositionLimitYDown=0.2`
+- `PositionLimitZ=0.4`
+- `PositionLimitZBack=0.1`
+- `ToggleKey=End, Ctrl+Shift+Y`
+- `CycleTrackingModeKey=PageUp, Ctrl+Shift+G`
+- `YawModeKey=PageDown, Ctrl+Shift+H`
+
+With every setting at its default, the file reads:
 
 ```ini
+; Control: Ultimate Edition head tracking settings.
+; Comments start with ; and go on their own line. Text after a value is part of the value.
+; Hotkeys are key names such as End, PageUp or Ctrl+Shift+Y. Separate several with commas; leave empty for none.
+; A setting set to default takes its value from Defaults.ini, which every head tracking mod
+; that keeps its settings in CameraUnlock.ini reads: %AppData%\CameraUnlock\Defaults.ini on
+; Windows, $XDG_CONFIG_HOME/CameraUnlock/Defaults.ini (normally ~/.config/CameraUnlock) on
+; Linux, under Wine and Proton too, and ~/Library/Application Support/CameraUnlock/Defaults.ini
+; on macOS. The log names the file it read. Write a value instead of default to change that
+; setting for this game only.
+
+[CameraUnlock]
+; Written by the mod. Leave this section in place.
+ConfigFormat=1
+
 [Network]
-UdpPort = 4242            ; OpenTrack UDP port. All interfaces are listened on.
+; UDP port the mod receives tracker data on (OpenTrack protocol).
+UdpPort=default
 
 [General]
-; start with tracking active
-EnableOnStartup = true
-; enable 6DOF positional tracking
-PositionEnabled = true
-; true = horizon-locked yaw, false = camera-local
-WorldSpaceYaw = true
+; true: head tracking is on when the game starts. ToggleKey turns it on and off.
+EnableOnStartup=default
+; true: yaw turns around the world's up axis. false: around the camera's own up axis.
+WorldSpaceYaw=default
+; true: turning your head turns the view.
+; Tracking mode at startup, with PositionEnabled. The mode hotkey changes both.
+RotationEnabled=default
 
-[Camera]
-; Field of view multiplier. This is the same multiplier as Control's FOV Scale
-; slider under Options > Graphics, written past the 0.75-1.25 range the game
-; clamps that slider to and re-applied every frame. 0 leaves Control's own
-; slider in charge; otherwise 0.5 to 2.0. It scales the tangent of the
-; half-angle, so from Control's default 70 degrees horizontal: 1.25 gives 82,
-; 1.5 gives 93, 2.0 gives 109. Aim zoom still works, and cutscenes keep their
-; authored framing.
-FovScale = 0.00
-
-[Rotation]
-YawSensitivity = 1.00     ; multiplier for left/right
-PitchSensitivity = 1.00   ; multiplier for up/down
-RollSensitivity = 1.00    ; multiplier for tilt
-InvertYaw = false
-InvertPitch = false
-InvertRoll = false
-; Smoothing covers rotation and position alike. Which of the two is used is
-; picked per connection from the packet's source address, and only LOOPBACK
-; counts as local: a tracker running on this PC but sending to this machine's
-; LAN address is treated as remote. Nothing floors either value; 0 is the
-; lightest setting, a 20 ms time constant, not literally instant.
-LocalSmoothing = 0.00     ; tracker sending to 127.0.0.1. 0 = responsive, 1 = heavy
-RemoteSmoothing = 0.15    ; tracker on the network, e.g. a phone over WiFi
-YawDeadzone = 0.00        ; degrees of dead center
-PitchDeadzone = 0.00
-RollDeadzone = 0.00
+[Smoothing]
+; Smoothing when the tracker runs on this PC. 0 is the least, 1 the most.
+LocalSmoothing=default
+; Smoothing when the tracker is another device on the network, such as a phone.
+; 0 is the least, 1 the most.
+RemoteSmoothing=default
 
 [Position]
-SensitivityX = 1.00       ; lean left/right
-SensitivityY = 1.00       ; up/down
-SensitivityZ = 1.00       ; forward/back
-LimitX = 0.30             ; meters, symmetric
-LimitY = 0.20             ; meters, symmetric
-LimitZ = 0.40             ; meters forward
-LimitZBack = 0.10         ; meters back
+; true: moving your head moves the view.
+; Tracking mode at startup, with RotationEnabled. The mode hotkey changes both.
+PositionEnabled=default
+; How far, in metres, leaning left or right can move the view.
+PositionLimitX=default
+; How far, in metres, raising your head can move the view.
+PositionLimitY=default
+; How far, in metres, lowering your head can move the view.
+PositionLimitYDown=default
+; How far, in metres, leaning forward can move the view.
+PositionLimitZ=default
+; How far, in metres, leaning back can move the view.
+PositionLimitZBack=default
 
 [Hotkeys]
-; Win32 Virtual Key codes. Defaults: End, PageUp, PageDown.
-Toggle = 35
-TogglePosition = 33
-ToggleYawMode = 34
+; Turns head tracking on and off.
+ToggleKey=default
+; Changes the tracking mode: rotation and position, rotation only, position only.
+CycleTrackingModeKey=default
+; Switches yaw between the world's up axis and the camera's own (WorldSpaceYaw).
+YawModeKey=default
+
+[Camera]
+; Field of view. Control has its own FOV Scale slider under Options > Graphics,
+; but the game clamps that slider to 0.75-1.25. This is the same multiplier,
+; written past the clamp and applied again every frame. 0 leaves Control's own
+; slider in charge. Otherwise 0.5 to 2.0: from Control's default 70 degrees
+; horizontal, 1.25 gives 82, 1.5 gives 93 and 2.0 gives 109. Cutscenes keep their
+; own framing.
+FovScale=0.0
 ```
+<!-- /cameraunlock:config -->
 
 ## Troubleshooting
 
@@ -215,24 +251,23 @@ ToggleYawMode = 34
   pause menu.
 
 **Jittery or unstable tracking.**
-- Raise the smoothing value your tracker actually uses in the `[Rotation]` section toward `0.30` or higher: `LocalSmoothing` if it sends to `127.0.0.1`, `RemoteSmoothing` otherwise. Only loopback counts as local, so OpenTrack running on this PC but pointed at your LAN address gets `RemoteSmoothing`. The log records which of the two is in effect once tracking is running.
+- Raise the smoothing value your tracker actually uses in the `[Smoothing]` section of `CameraUnlock.ini` toward `0.30` or higher: `LocalSmoothing` if it sends to `127.0.0.1`, `RemoteSmoothing` otherwise. Only loopback counts as local, so OpenTrack running on this PC but pointed at your LAN address gets `RemoteSmoothing`. The log records which of the two is in effect once tracking is running.
 - Wireless and webcam trackers are noisier; a little extra smoothing helps.
 
 **Wrong rotation axis or inverted view.**
-- Flip the relevant `Invert` toggle in the `[Rotation]` section. They all ship as
-  `false`: the directions Control needs are already applied inside the mod, so a
-  toggle only ever compensates for a tracker whose own axes run the other way.
+- The directions Control needs are applied inside the mod. If one axis still
+  runs the wrong way, invert it in your tracker.
 - If yaw feels wrong at extreme up/down angles, toggle yaw mode with `Page Down` (or `Ctrl+Shift+H`).
 
 ## Updating
 
-Download the new release and run `install.cmd` again. Your `HeadTracking.ini`
-config is preserved.
+Download the new release and run `install.cmd` again. Your `CameraUnlock.ini`
+is preserved.
 
 ## Uninstalling
 
 Run `uninstall.cmd`. This removes the mod DLL and leaves your
-`HeadTracking.ini` alone. The Ultimate ASI Loader (`winmm.dll`) is removed only
+`CameraUnlock.ini` and any `HeadTracking.ini` from an earlier version alone. The Ultimate ASI Loader (`winmm.dll`) is removed only
 if the installer put it there (tracked via `.headtracking-state.json`). Use
 `uninstall.cmd /force` to remove it anyway.
 

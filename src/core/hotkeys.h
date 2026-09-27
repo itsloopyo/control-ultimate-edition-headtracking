@@ -6,9 +6,8 @@
 
 namespace ControlHT {
 
-// Nav-cluster hotkeys, their Ctrl+Shift chord aliases (AGENTS.md "Chord
-// Alternatives"), and the F9/F10 camera-discovery diagnostics, all polled
-// on one core HotkeyPoller thread (~60Hz).
+// The three key lists from CameraUnlock.ini, chords included, all polled on
+// one core HotkeyPoller thread (~60Hz).
 class Hotkeys {
 public:
     bool Start(const Config& cfg);

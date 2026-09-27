@@ -24,14 +24,21 @@ std::string GetModDirectory() {
     return path.substr(0, slash);
 }
 
-std::wstring GetModPathW(const char* filename) {
-    std::string narrow = GetModDirectory() + "\\" + filename;
+static std::wstring Widen(const std::string& narrow) {
     int len = MultiByteToWideChar(CP_ACP, 0, narrow.c_str(), -1, nullptr, 0);
     if (len <= 1) return {};
     std::wstring wide(static_cast<size_t>(len), L'\0');
     MultiByteToWideChar(CP_ACP, 0, narrow.c_str(), -1, &wide[0], len);
     wide.pop_back();
     return wide;
+}
+
+std::wstring GetModDirectoryW() {
+    return Widen(GetModDirectory());
+}
+
+std::wstring GetModPathW(const char* filename) {
+    return Widen(GetModDirectory() + "\\" + filename);
 }
 
 } // namespace ControlHT::PathUtils

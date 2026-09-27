@@ -73,6 +73,8 @@ if ($Version -notmatch '^\d+\.\d+\.\d+$') {
     exit 1
 }
 
+Assert-ReleaseNotBelowCanonicalSince -RepoRoot $ProjectRoot -Version $Version
+
 Write-Host "Releasing v$Version (from v$currentVersion)..." -ForegroundColor Cyan
 
 Push-Location $ProjectRoot

@@ -14,3 +14,4 @@
 extern/minhook/LICENSE.txt -text
 vendor/ultimate-asi-loader/LICENSE -text
 tests/config_differential/data/** -text
+CameraUnlock.ini -text

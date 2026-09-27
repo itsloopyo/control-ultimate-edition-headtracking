@@ -3,33 +3,39 @@
 #include "mod.h"
 #include "logging.h"
 
-#include <cameraunlock/input/chord_hotkeys.h>
+#include <cameraunlock/input/key_binding_registration.h>
+#include <cameraunlock/input/key_bindings.h>
+
+#include <functional>
 
 namespace ControlHT {
+
+namespace {
+
+// Puts one key list from CameraUnlock.ini on the poller. The table only accepts
+// a list that parses, so a failure here is a bug, not a player's typo.
+void Register(cameraunlock::input::HotkeyPoller& poller, const char* name, const std::string& list,
+              std::function<void()> action) {
+    const cameraunlock::input::KeyBindingsParseResult parsed = cameraunlock::input::ParseKeyBindings(list);
+    if (!parsed.ok()) throw std::logic_error(std::string("[Hotkeys] ") + name + " does not parse: " + list);
+    cameraunlock::input::RegisterKeyBindings(poller, parsed.bindings, std::move(action));
+    Log::Line("Hotkey %s: %s", name, list.empty() ? "(unbound)" : list.c_str());
+}
+
+}  // namespace
 
 bool Hotkeys::Start(const Config& cfg) {
     if (m_started) return true;
 
-    using cameraunlock::input::ChordGuarded;
-
-    // Primary nav-cluster bindings
-    m_poller.AddHotkey(cfg.toggleKey, [] { Mod::Instance().Toggle(); });
-    m_poller.AddHotkey(cfg.togglePositionKey, [] { Mod::Instance().CycleTrackingMode(); });
-    m_poller.AddHotkey(cfg.toggleYawModeKey, [] { Mod::Instance().ToggleYawMode(); });
-
-    // Chord aliases: Ctrl+Shift+Y/G/H
-    m_poller.AddHotkey('Y', ChordGuarded([] { Mod::Instance().Toggle(); }));
-    m_poller.AddHotkey('G', ChordGuarded([] { Mod::Instance().CycleTrackingMode(); }));
-    m_poller.AddHotkey('H', ChordGuarded([] { Mod::Instance().ToggleYawMode(); }));
+    Register(m_poller, "ToggleKey", cfg.toggleKey, [] { Mod::Instance().Toggle(); });
+    Register(m_poller, "CycleTrackingModeKey", cfg.cycleTrackingModeKey,
+             [] { Mod::Instance().CycleTrackingMode(); });
+    Register(m_poller, "YawModeKey", cfg.yawModeKey, [] { Mod::Instance().ToggleYawMode(); });
 
     if (!m_poller.Start()) {
         Log::Line("ERROR: Hotkey poller failed to start");
         return false;
     }
-
-    Log::Line("Hotkeys ready: toggle=0x%02X position=0x%02X yawmode=0x%02X "
-              "+ Ctrl+Shift+Y/G/H chords",
-              cfg.toggleKey, cfg.togglePositionKey, cfg.toggleYawModeKey);
 
     m_started = true;
     return true;

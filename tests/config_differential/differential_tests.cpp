@@ -5,6 +5,10 @@
 //              only published build (oracle/oracle_reader.cpp)
 //   Import     the frozen reader in src/legacy_config/, through the startup
 //              code of the commit that froze it
+//   Migration  the config owner's Load in a folder holding only the input as
+//              HeadTracking.ini, which imports it into a new CameraUnlock.ini,
+//              then the canonical reader and table on it, through this build's
+//              startup code
 //
 // Comparison 1, oracle against import, is what a player sees change that the
 // conversion did not cause: commits since the dev build that change how the
@@ -14,6 +18,9 @@
 // set the downward lean limit as well as the upward one, where the dev build
 // left the downward limit at 0.20. That is the only difference allowed, and
 // only on the downward limit.
+//
+// Comparison 2, import against migration, is the proof for the conversion; see
+// the section of that name below for what it allows.
 //
 // Inputs: the file the dev build writes on its first run (no release shipped
 // or seeded a HeadTracking.ini), no file, an empty file, core's mutation corpus
@@ -28,18 +35,26 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iterator>
 #include <map>
+#include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
+#include "core/config.h"
 #include "legacy_config/legacy_config.h"
 #include "oracle/oracle_reader.h"
 
+#include "cameraunlock/config/canonical_ini.h"
+#include "cameraunlock/config/config_owner.h"
 #include "cameraunlock/config/legacy_import.h"
 #include "cameraunlock/config/testing/ini_mutations.h"
+#include "cameraunlock/input/key_bindings.h"
 
 namespace {
 
@@ -74,8 +89,8 @@ void WriteFileBytes(const fs::path& path, const std::string& bytes) {
 //
 // One folder per reading: GetPrivateProfileString, which every reader here sits
 // on, is free to cache the file it last read. `game` stands for the folder the
-// game exe runs from. Every folder lives under one root for the run, removed
-// once at the end.
+// game exe runs from, and Defaults.ini sits in `global` beside it. Every folder
+// lives under one root for the run, removed once at the end.
 
 void RemoveTree(const fs::path& root) {
     if (!fs::exists(root)) return;
@@ -106,8 +121,14 @@ public:
 
     fs::path game() const { return root_ / "game"; }
     fs::path legacy() const { return game() / "HeadTracking.ini"; }
+    fs::path canonical() const { return game() / "CameraUnlock.ini"; }
+    fs::path defaults() const { return root_ / "global" / "Defaults.ini"; }
 
     void WriteLegacy(const std::string& bytes) const { WriteFileBytes(legacy(), bytes); }
+    void WriteDefaults(const std::string& bytes) const {
+        fs::create_directories(defaults().parent_path());
+        WriteFileBytes(defaults(), bytes);
+    }
 
 private:
     fs::path root_;
@@ -383,6 +404,440 @@ void Compare(const std::vector<Input>& inputs) {
     Check(limit_y_down > 0, "the inputs reach 71f6cda's difference");
 }
 
+// ---- Comparison 2 ------------------------------------------------------------------
+//
+// The migration: the config owner's Load in a game folder holding only the input
+// as HeadTracking.ini, which imports it through config::Import into a new
+// CameraUnlock.ini, then the canonical reader and table on that file. It must
+// start the mod exactly as the import did, apart from the changes core's
+// data/config-format.json approves:
+//
+//   pose_shaping  a sensitivity, inversion or deadzone the player set away from
+//                 the shipped identity is dropped, and the session runs at
+//                 identity. Every shipped value is identity, so nothing folds.
+//   N3            a hotkey on Ctrl, Shift or Alt alone is unbound; its
+//                 Ctrl+Shift chord stays.
+//
+// The frozen reader holds every float finite and inside a range the canonical
+// rows accept, and every hotkey inside 0x01-0xFE, so no input needs N1 or N2
+// and none is deferred.
+//
+// Each input with a file migrates three times: over a Defaults.ini the owner
+// creates with the built-in values, from a read-only HeadTracking.ini, and over
+// a Defaults.ini that differs from the built-in value on every global row. The
+// first two give the settings the import read. A setting still at what the dev
+// build shipped is no player's choice (owner rule of 2026-09-26), so it is
+// written `default` and the third gives Defaults.ini's value for it; a setting
+// the player changed keeps the imported value there too.
+
+using Drop = std::tuple<cfg::DropRule, std::string, std::string>;
+
+// The settings the running mod acts on from a canonical Config, through this
+// build's startup code: src/core/mod.cpp ApplyConfigToSession, which leaves the
+// processors at identity sensitivity, inversion and deadzone, its port fallback
+// and FovScale floor, and src/core/hotkeys.cpp, which puts each list through
+// ParseKeyBindings and RegisterKeyBindings.
+Record ObserveCanonical(const ControlHT::Config& c) {
+    control_oracle::Published g;
+    g.udp_port = (c.udpPort < 1024 || c.udpPort > 65535) ? 4242 : c.udpPort;
+    g.tracking_enabled = c.enableOnStartup;
+    g.world_space_yaw = c.worldSpaceYaw;
+    g.tracking_mode = static_cast<int>(ControlHT::config::StartupTrackingMode(c));
+    g.fov_scale = (c.fovScale > 0.0f && c.fovScale < 0.5f) ? 0.5f : c.fovScale;
+    g.yaw_sens = 1.0f;
+    g.pitch_sens = 1.0f;
+    g.roll_sens = 1.0f;
+    g.local_smoothing = c.localSmoothing;
+    g.remote_smoothing = c.remoteSmoothing;
+    g.pos_sens_x = 1.0f;
+    g.pos_sens_y = 1.0f;
+    g.pos_sens_z = 1.0f;
+    g.limit_x = c.limitX;
+    g.limit_y = c.limitY;
+    g.limit_y_down = c.limitYDown;
+    g.limit_z = c.limitZ;
+    g.limit_z_back = c.limitZBack;
+    const std::pair<int, const std::string*> lists[] = {
+        {control_oracle::kToggle, &c.toggleKey},
+        {control_oracle::kCycleMode, &c.cycleTrackingModeKey},
+        {control_oracle::kYawMode, &c.yawModeKey},
+    };
+    for (const auto& [action, list] : lists) {
+        const cameraunlock::input::KeyBindingsParseResult parsed = cameraunlock::input::ParseKeyBindings(*list);
+        Check(parsed.ok(), "a migrated key list parses: " + *list);
+        for (const cameraunlock::input::KeyBinding& b : parsed.bindings) {
+            g.hotkeys.push_back({action, b.vk, static_cast<unsigned>(b.modifiers)});
+        }
+    }
+    return ObserveOracle(g);
+}
+
+// The drops the approved changes call for, from what the frozen reader read, and
+// the settings the session then runs on: comparison 2's whole allowance.
+struct Allowed {
+    std::vector<Drop> dropped;
+    Record observed;
+};
+
+bool ModifierKey(int code) { return (code >= 0x10 && code <= 0x12) || (code >= 0xA0 && code <= 0xA5); }
+
+Allowed ApplyApprovedChanges(const legacy::Config& read) {
+    Allowed a;
+    legacy::Config c = read;
+    const auto shaping = [&a](auto& value, auto shipped, const char* section, const char* key) {
+        if (value != shipped) a.dropped.push_back({cfg::DropRule::PoseShaping, section, key});
+        value = shipped;
+    };
+    shaping(c.yawSensitivity, 1.0f, "Rotation", "YawSensitivity");
+    shaping(c.pitchSensitivity, 1.0f, "Rotation", "PitchSensitivity");
+    shaping(c.rollSensitivity, 1.0f, "Rotation", "RollSensitivity");
+    shaping(c.invertYaw, false, "Rotation", "InvertYaw");
+    shaping(c.invertPitch, false, "Rotation", "InvertPitch");
+    shaping(c.invertRoll, false, "Rotation", "InvertRoll");
+    shaping(c.yawDeadzone, 0.0f, "Rotation", "YawDeadzone");
+    shaping(c.pitchDeadzone, 0.0f, "Rotation", "PitchDeadzone");
+    shaping(c.rollDeadzone, 0.0f, "Rotation", "RollDeadzone");
+    shaping(c.positionSensitivityX, 1.0f, "Position", "SensitivityX");
+    shaping(c.positionSensitivityY, 1.0f, "Position", "SensitivityY");
+    shaping(c.positionSensitivityZ, 1.0f, "Position", "SensitivityZ");
+    const std::pair<int*, const char*> hotkeys[] = {
+        {&c.toggleKey, "Toggle"}, {&c.togglePositionKey, "TogglePosition"}, {&c.toggleYawModeKey, "ToggleYawMode"}};
+    for (const auto& [code, key] : hotkeys) {
+        if (!ModifierKey(*code)) continue;
+        a.dropped.push_back({cfg::DropRule::ModifierKey, "Hotkeys", key});
+        *code = 0;
+    }
+
+    std::sort(a.dropped.begin(), a.dropped.end());
+    a.observed = ObserveImport(c);
+    return a;
+}
+
+std::vector<std::string> CanonicalDiagnostics(const std::string& bytes, ControlHT::Config& out) {
+    std::vector<std::string> found;
+    const cfg::CanonicalIni doc = cfg::ParseCanonicalIni(bytes);
+    for (const cfg::CanonicalDiagnostic& d : doc.diagnostics) found.push_back("reader: " + cfg::DescribeCanonicalDiagnostic(d));
+    const cfg::ConfigTable<ControlHT::Config> table = ControlHT::config::Table();
+    out = table.defaults();
+    for (const cfg::CanonicalDiagnostic& d : cfg::ApplyCanonical(doc, table, out).diagnostics) {
+        found.push_back("table: " + cfg::DescribeCanonicalDiagnostic(d));
+    }
+    return found;
+}
+
+bool AsciiCrlf(const std::string& bytes) {
+    for (std::size_t i = 0; i < bytes.size(); ++i) {
+        const unsigned char c = static_cast<unsigned char>(bytes[i]);
+        if (c > 0x7E) return false;
+        if (c == '\r' && (i + 1 == bytes.size() || bytes[i + 1] != '\n')) return false;
+        if (c == '\n' && (i == 0 || bytes[i - 1] != '\r')) return false;
+        if (c < 0x20 && c != '\r' && c != '\n') return false;
+    }
+    return !bytes.empty() && bytes.back() == '\n';
+}
+
+// A file's bytes, last write time and attributes, which no load may change.
+struct FileState {
+    std::string bytes;
+    unsigned long long written = 0;
+    DWORD attributes = 0;
+    bool operator==(const FileState& other) const {
+        return bytes == other.bytes && written == other.written && attributes == other.attributes;
+    }
+};
+
+std::optional<FileState> StateOf(const fs::path& path) {
+    WIN32_FILE_ATTRIBUTE_DATA data{};
+    if (!GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &data)) {
+        const DWORD error = GetLastError();
+        if (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND) return std::nullopt;
+        throw std::runtime_error("cannot read the attributes of " + path.string());
+    }
+    FileState state;
+    state.bytes = ReadFileBytes(path);
+    state.written = (static_cast<unsigned long long>(data.ftLastWriteTime.dwHighDateTime) << 32) |
+                    data.ftLastWriteTime.dwLowDateTime;
+    state.attributes = data.dwFileAttributes;
+    return state;
+}
+
+std::set<std::string> Names(const fs::path& folder) {
+    std::set<std::string> names;
+    for (const auto& entry : fs::directory_iterator(folder)) names.insert(entry.path().filename().string());
+    return names;
+}
+
+bool LogSays(const std::vector<std::string>& log, const std::string& text) {
+    for (const std::string& line : log) {
+        if (line.find(text) != std::string::npos) return true;
+    }
+    return false;
+}
+
+// A Defaults.ini holding a value other than the built-in one on every global row
+// the table binds, so a migration that wrote `default` where the imported value
+// is not what `default` gives would read back differently over it.
+const char* const kSkewedDefaults =
+    "[CameraUnlock]\r\nConfigFormat=1\r\n\r\n"
+    "[Network]\r\nUdpPort=5252\r\n\r\n"
+    "[General]\r\nEnableOnStartup=false\r\nWorldSpaceYaw=false\r\nRotationEnabled=false\r\n\r\n"
+    "[Smoothing]\r\nLocalSmoothing=0.5\r\nRemoteSmoothing=0.5\r\n\r\n"
+    "[Position]\r\nPositionEnabled=true\r\nPositionLimitX=0.5\r\nPositionLimitY=0.5\r\nPositionLimitYDown=0.5\r\n"
+    "PositionLimitZ=0.5\r\nPositionLimitZBack=0.5\r\n\r\n"
+    "[Hotkeys]\r\nToggleKey=F8\r\nCycleTrackingModeKey=F9\r\nYawModeKey=F10\r\n";
+
+// A global row of the table and whether the player left it at what the dev
+// build shipped, with what kSkewedDefaults gives it. The frozen struct's
+// defaults are what the dev build shipped, and its first-run file writes the
+// same values. The two tracking mode rows are one unit, read from
+// [General] PositionEnabled alone, and the downward limit is LimitY's.
+struct FollowRow {
+    const char* key;
+    bool untouched;
+    std::function<void(ControlHT::Config&)> skew;
+};
+
+std::vector<FollowRow> FollowRows(const legacy::Config& read) {
+    const legacy::Config shipped;
+    const bool mode = read.positionEnabled == shipped.positionEnabled;
+    const int port = (read.udpPort < 1024 || read.udpPort > 65535) ? 4242 : read.udpPort;
+    using C = ControlHT::Config;
+    return {
+        {"UdpPort", port == shipped.udpPort, [](C& c) { c.udpPort = 5252; }},
+        {"EnableOnStartup", read.enableOnStartup == shipped.enableOnStartup, [](C& c) { c.enableOnStartup = false; }},
+        {"WorldSpaceYaw", read.worldSpaceYaw == shipped.worldSpaceYaw, [](C& c) { c.worldSpaceYaw = false; }},
+        {"RotationEnabled", mode, [](C& c) { c.rotationEnabled = false; }},
+        {"PositionEnabled", mode, [](C& c) { c.positionEnabled = true; }},
+        {"LocalSmoothing", read.localSmoothing == shipped.localSmoothing, [](C& c) { c.localSmoothing = 0.5f; }},
+        {"RemoteSmoothing", read.remoteSmoothing == shipped.remoteSmoothing, [](C& c) { c.remoteSmoothing = 0.5f; }},
+        {"PositionLimitX", read.limitX == shipped.limitX, [](C& c) { c.limitX = 0.5f; }},
+        {"PositionLimitY", read.limitY == shipped.limitY, [](C& c) { c.limitY = 0.5f; }},
+        {"PositionLimitYDown", read.limitY == shipped.limitY, [](C& c) { c.limitYDown = 0.5f; }},
+        {"PositionLimitZ", read.limitZ == shipped.limitZ, [](C& c) { c.limitZ = 0.5f; }},
+        {"PositionLimitZBack", read.limitZBack == shipped.limitZBack, [](C& c) { c.limitZBack = 0.5f; }},
+        {"ToggleKey", read.toggleKey == shipped.toggleKey, [](C& c) { c.toggleKey = "F8"; }},
+        {"CycleTrackingModeKey", read.togglePositionKey == shipped.togglePositionKey,
+         [](C& c) { c.cycleTrackingModeKey = "F9"; }},
+        {"YawModeKey", read.toggleYawModeKey == shipped.toggleYawModeKey, [](C& c) { c.yawModeKey = "F10"; }},
+    };
+}
+
+// The value text of `key` in a canonical file, whose keys this table never
+// repeats across sections; nullopt where the file has no such line.
+std::optional<std::string> RowValue(const std::string& bytes, const std::string& key) {
+    const std::string start = "\r\n" + key + "=";
+    const std::size_t at = bytes.find(start);
+    if (at == std::string::npos) return std::nullopt;
+    const std::size_t from = at + start.size();
+    return bytes.substr(from, bytes.find("\r\n", from) - from);
+}
+
+// The folder beside this executable the migrated files are written to, for
+// lint-migrated.mjs, which CTest runs after this test.
+fs::path MigratedFolder() {
+    std::vector<wchar_t> exe(MAX_PATH);
+    for (;;) {
+        const DWORD length = GetModuleFileNameW(nullptr, exe.data(), static_cast<DWORD>(exe.size()));
+        if (length == 0) throw std::runtime_error("cannot find this executable's path");
+        if (length < exe.size()) return fs::path(std::wstring(exe.data(), length)).parent_path() / "migrated";
+        exe.resize(exe.size() * 2);
+    }
+}
+
+cfg::ConfigOwnerOptions<ControlHT::Config> OwnerOptions(const Scratch& s) {
+    return ControlHT::config::OwnerOptions(s.game().wstring(), cfg::DefaultsFile::At(s.defaults().wstring()));
+}
+
+// Runs the owner's Load in `s`, whose game folder holds the input as
+// HeadTracking.ini or nothing, checks what a load must do beyond comparison 2,
+// and returns the settings the session runs on. A file it creates by migrating
+// goes into `migrated_files`.
+ControlHT::Config Migrate(const Input& input, const Scratch& s, const std::string& label,
+                          std::set<std::string>& migrated_files) {
+    const std::optional<FileState> legacy_before = StateOf(s.legacy());
+    const std::optional<FileState> defaults_before = StateOf(s.defaults());
+
+    const cfg::ConfigLoadResult<ControlHT::Config> loaded = cfg::ConfigOwner<ControlHT::Config>(OwnerOptions(s)).Load();
+    const cfg::ConfigLoadStatus want = input.present ? cfg::ConfigLoadStatus::Migrated : cfg::ConfigLoadStatus::Created;
+    if (loaded.status != want) {
+        std::printf("  %s: %s, %s\n", label.c_str(), cfg::ConfigLoadStatusName(loaded.status), loaded.reason.c_str());
+    }
+    Check(loaded.status == want, label + ": the load is " + cfg::ConfigLoadStatusName(want));
+    Check(StateOf(s.legacy()) == legacy_before, label + ": a load leaves HeadTracking.ini's bytes, write time and attributes");
+    Check(!defaults_before || StateOf(s.defaults()) == defaults_before, label + ": a load leaves Defaults.ini as it was");
+    if (loaded.status != want) return loaded.config;
+
+    Check(Names(s.game()) == (input.present ? std::set<std::string>{"CameraUnlock.ini", "HeadTracking.ini"}
+                                            : std::set<std::string>{"CameraUnlock.ini"}),
+          label + ": the game folder holds HeadTracking.ini and CameraUnlock.ini and nothing else");
+
+    const std::string migrated = ReadFileBytes(s.canonical());
+    Check(cfg::HasCanonicalStamp(migrated), label + ": CameraUnlock.ini carries the stamp");
+    Check(AsciiCrlf(migrated), label + ": CameraUnlock.ini is ASCII with CRLF line ends");
+    ControlHT::Config reread;
+    const std::vector<std::string> diagnostics = CanonicalDiagnostics(migrated, reread);
+    for (const std::string& d : diagnostics) std::printf("  %s: CameraUnlock.ini, %s\n", label.c_str(), d.c_str());
+    Check(diagnostics.empty(), label + ": CameraUnlock.ini reads with no diagnostic");
+    if (input.present) migrated_files.insert(migrated);
+
+    // The next start reads CameraUnlock.ini, imports nothing and writes nothing.
+    const std::optional<FileState> created = StateOf(s.canonical());
+    const cfg::ConfigLoadResult<ControlHT::Config> again = cfg::ConfigOwner<ControlHT::Config>(OwnerOptions(s)).Load();
+    Check(again.status == cfg::ConfigLoadStatus::Canonical, label + ": the next start reads CameraUnlock.ini");
+    Check(Differences(ObserveCanonical(again.config), ObserveCanonical(loaded.config)).empty(),
+          label + ": the next start runs on the same settings");
+    Check(StateOf(s.canonical()) == created && StateOf(s.legacy()) == legacy_before,
+          label + ": the next start changes neither file");
+    Check(!input.present || LogSays(again.log, "is left as it was and is not read"),
+          label + ": the next start logs that HeadTracking.ini is not read");
+    return loaded.config;
+}
+
+void ImportAgainstMigration(const std::vector<Input>& inputs) {
+    const std::string committed = ReadFileBytes(fs::path(CONTROL_SOURCE_DIR) / "CameraUnlock.ini");
+    const cfg::ConfigTable<ControlHT::Config> table = ControlHT::config::Table();
+    std::set<std::string> migrated_files;
+    int compared = 0;
+    int dropping = 0;
+    int modifier = 0;
+    std::map<std::string, std::pair<int, int>> follow_seen;  // untouched, changed
+    for (const Input& input : inputs) {
+        const std::string& name = input.name;
+
+        // The import, run as the owner runs it but on a read-only copy: it reads
+        // what the frozen reader reads, drops what the approved changes drop, and
+        // writes nothing.
+        cfg::ImportResult imported;
+        legacy::Config read;
+        {
+            Scratch ro;
+            if (input.present) {
+                ro.WriteLegacy(input.bytes);
+                SetFileAttributesW(ro.legacy().c_str(), FILE_ATTRIBUTE_READONLY);
+            }
+            const std::optional<FileState> before = StateOf(ro.legacy());
+            ControlHT::Config unused = table.defaults();
+            imported = ControlHT::config::Import().run({ro.legacy().wstring(), ro.legacy().string(), false}, unused);
+            const std::set<std::string> left = input.present ? std::set<std::string>{"HeadTracking.ini"}
+                                                             : std::set<std::string>{};
+            Check(StateOf(ro.legacy()) == before && Names(ro.game()) == left,
+                  name + ": the import leaves a read-only folder as it was");
+            legacy::Load(ro.legacy().string(), read);
+        }
+        Check(imported.status == (input.present ? cfg::ImportStatus::Imported : cfg::ImportStatus::Absent),
+              name + ": the import reads every input, as the published build did");
+
+        const Allowed allowed = ApplyApprovedChanges(read);
+        const std::vector<FollowRow> follow = FollowRows(read);
+        for (const FollowRow& row : follow) {
+            auto& seen = follow_seen[row.key];
+            ++(row.untouched ? seen.first : seen.second);
+        }
+        if (!allowed.dropped.empty()) ++dropping;
+        for (const Drop& d : allowed.dropped) {
+            if (std::get<0>(d) == cfg::DropRule::ModifierKey) ++modifier;
+        }
+        std::vector<Drop> dropped;
+        for (const cfg::DroppedValue& d : imported.dropped) dropped.push_back({d.rule, d.section, d.key});
+        std::sort(dropped.begin(), dropped.end());
+        Check(dropped == allowed.dropped, name + ": the import drops exactly what the approved changes drop");
+        Check(imported.pose_shaping.size() == 12, name + ": the import records all twelve pose-shaping settings");
+        for (const cfg::PoseShapingValue& p : imported.pose_shaping) {
+            const bool changed = std::find(allowed.dropped.begin(), allowed.dropped.end(),
+                                           Drop{cfg::DropRule::PoseShaping, p.section, p.key}) != allowed.dropped.end();
+            Check(p.folded != changed, name + ": [" + p.section + "] " + p.key + " folds exactly when it is the shipped value");
+        }
+
+        // Over a Defaults.ini the owner creates with the built-in values.
+        ControlHT::Config migrated_over_built_in;
+        {
+            Scratch s;
+            if (input.present) s.WriteLegacy(input.bytes);
+            const ControlHT::Config migrated = Migrate(input, s, name, migrated_files);
+            migrated_over_built_in = migrated;
+            const std::vector<std::string> diff = Differences(allowed.observed, ObserveCanonical(migrated));
+            for (const std::string& d : diff) std::printf("  comparison 2, %s: %s\n", name.c_str(), d.c_str());
+            Check(diff.empty(), name + ": comparison 2, the migration runs as the import read, less the approved changes");
+
+            // Over the built-in values the table's own defaults stand for Defaults.ini.
+            ControlHT::Config reread;
+            CanonicalDiagnostics(ReadFileBytes(s.canonical()), reread);
+            Check(Differences(ObserveCanonical(reread), ObserveCanonical(migrated)).empty(),
+                  name + ": CameraUnlock.ini reads back as the settings the session runs on");
+
+            // A row the player left at what the dev build shipped is written
+            // default. One they changed holds its value: every shipped value is
+            // the schema's, so a changed one is never what default gives here.
+            const std::string written = ReadFileBytes(s.canonical());
+            for (const FollowRow& row : follow) {
+                const std::optional<std::string> value = RowValue(written, row.key);
+                Check(value.has_value(), name + ": CameraUnlock.ini has a " + row.key + " row");
+                if (!value) continue;
+                Check((*value == "default") == row.untouched,
+                      name + ": " + row.key + "=" + *value +
+                          (row.untouched ? " follows Defaults.ini, as the player never changed it"
+                                         : " is the player's own value"));
+            }
+
+            // Fresh equals upgrade: the published build's first-run file, and no
+            // file at all, both end as the committed file.
+            if (name == kFirstRunName || name == "no file") {
+                Check(written == committed, name + ": gives the committed file byte for byte");
+            }
+        }
+
+        if (!input.present) {
+            ++compared;
+            continue;
+        }
+
+        // From a read-only HeadTracking.ini, which keeps its attribute.
+        {
+            Scratch ro;
+            ro.WriteLegacy(input.bytes);
+            SetFileAttributesW(ro.legacy().c_str(), FILE_ATTRIBUTE_READONLY);
+            const ControlHT::Config c = Migrate(input, ro, name + " (read-only)", migrated_files);
+            Check(Differences(allowed.observed, ObserveCanonical(c)).empty(),
+                  name + ": a read-only HeadTracking.ini imports as a writable one does");
+            Check((GetFileAttributesW(ro.legacy().c_str()) & FILE_ATTRIBUTE_READONLY) != 0,
+                  name + ": HeadTracking.ini keeps its read-only attribute");
+        }
+
+        // Over a Defaults.ini that differs everywhere.
+        {
+            Scratch skewed;
+            skewed.WriteLegacy(input.bytes);
+            skewed.WriteDefaults(kSkewedDefaults);
+            const ControlHT::Config c = Migrate(input, skewed, name + " (skewed Defaults.ini)", migrated_files);
+            ControlHT::Config expected = migrated_over_built_in;
+            for (const FollowRow& row : follow) {
+                if (row.untouched) row.skew(expected);
+            }
+            const std::vector<std::string> diff = Differences(ObserveCanonical(expected), ObserveCanonical(c));
+            for (const std::string& d : diff) std::printf("  comparison 2, %s (skewed Defaults.ini): %s\n", name.c_str(), d.c_str());
+            Check(diff.empty(), name + ": comparison 2 over a Defaults.ini that differs everywhere, where each "
+                                "setting the player never changed takes Defaults.ini's value");
+        }
+        ++compared;
+    }
+    std::printf("comparison 2: %d inputs, %d with a value the approved changes drop, %d modifier hotkeys\n",
+                compared, dropping, modifier);
+    Check(dropping > 0 && modifier > 0, "the inputs reach the pose-shaping and modifier-key drops");
+    for (const auto& [key, seen] : follow_seen) {
+        Check(seen.first > 0 && seen.second > 0, "the inputs leave " + key + " at what the dev build shipped and change it");
+    }
+
+    // Core's canonical config lint runs over these next (lint-migrated.mjs).
+    const fs::path lint = MigratedFolder();
+    fs::remove_all(lint);
+    fs::create_directories(lint);
+    std::size_t n = 0;
+    for (const std::string& file : migrated_files) {
+        WriteFileBytes(lint / (std::to_string(n++) + ".ini"), file);
+    }
+    std::printf("%zu distinct migrated files written to %s\n", migrated_files.size(), lint.string().c_str());
+}
+
 }  // namespace
 
 int main() {
@@ -391,6 +846,7 @@ int main() {
     try {
         const std::vector<Input> inputs = Inputs();
         Compare(inputs);
+        ImportAgainstMigration(inputs);
         RemoveTree(ScratchRoot());
     } catch (const std::exception& e) {
         std::printf("FAIL: %s\n", e.what());

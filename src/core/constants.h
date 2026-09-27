@@ -4,7 +4,6 @@ namespace ControlHT {
 
 constexpr const char* CONTROLHT_VERSION = "0.0.0";
 
-constexpr const char* CONFIG_FILENAME = "HeadTracking.ini";
 constexpr const char* LOG_FILENAME = "HeadTracking.log";
 // The crash handler writes its report into the live log, and the player's next
 // action after a crash is to relaunch - which truncates it. One generation back

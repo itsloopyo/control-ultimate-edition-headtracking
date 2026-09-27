@@ -47,7 +47,7 @@ private:
     Mod() = default;
     ~Mod() = default;
 
-    bool LoadConfig();
+    void LoadConfig();
     void ApplyConfigToSession();
     void StartUdpReceiver();
     bool InitializeHooks();
@@ -62,6 +62,9 @@ private:
     // Frame dt is clamped to this ceiling so a stall (alt-tab, load hitch)
     // cannot feed a huge dt into the smoothing/extrapolation math.
     static constexpr float kMaxFrameDtSeconds = 0.25f;
+
+    // The narrowest field of view multiplier the mod writes.
+    static constexpr float kMinFovScale = 0.5f;
 
     std::atomic<bool> m_enabled{false};
     std::atomic<bool> m_initialized{false};
