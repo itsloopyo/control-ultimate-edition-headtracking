@@ -102,7 +102,7 @@ if(BUILD_TESTING)
     # The frozen HeadTracking.ini reader: the file-system boundary. Writes real
     # INI files to the temp directory and reads them back through it.
     add_executable(test_config_validation
-        tests/test_config_validation.cpp
+        tests/config_differential/legacy_reader_tests.cpp
         src/legacy_config/legacy_config.cpp)
     set_target_properties(test_config_validation PROPERTIES
         SKIP_PRECOMPILE_HEADERS ON)
