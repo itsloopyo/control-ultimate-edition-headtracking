@@ -7,6 +7,7 @@
 #include "hooks/engine_camera_hook.h"
 #include "hooks/coherent_reticle.h"
 #include "hooks/fov_override.h"
+#include "legacy_config/legacy_config.h"
 
 #include <cameraunlock/hooks/hook_manager.h>
 
@@ -124,7 +125,35 @@ void Mod::Shutdown() {
 bool Mod::LoadConfig() {
     std::string path = PathUtils::GetModDirectory() + "\\" + CONFIG_FILENAME;
     m_config.SaveDefaultIfMissing(path);
-    return m_config.LoadFromFile(path);
+    legacy::Config read;
+    const bool present = legacy::Load(path, read);
+    m_config.udpPort = read.udpPort;
+    m_config.enableOnStartup = read.enableOnStartup;
+    m_config.positionEnabled = read.positionEnabled;
+    m_config.worldSpaceYaw = read.worldSpaceYaw;
+    m_config.fovScale = read.fovScale;
+    m_config.yawSensitivity = read.yawSensitivity;
+    m_config.pitchSensitivity = read.pitchSensitivity;
+    m_config.rollSensitivity = read.rollSensitivity;
+    m_config.invertYaw = read.invertYaw;
+    m_config.invertPitch = read.invertPitch;
+    m_config.invertRoll = read.invertRoll;
+    m_config.localSmoothing = read.localSmoothing;
+    m_config.remoteSmoothing = read.remoteSmoothing;
+    m_config.yawDeadzone = read.yawDeadzone;
+    m_config.pitchDeadzone = read.pitchDeadzone;
+    m_config.rollDeadzone = read.rollDeadzone;
+    m_config.positionSensitivityX = read.positionSensitivityX;
+    m_config.positionSensitivityY = read.positionSensitivityY;
+    m_config.positionSensitivityZ = read.positionSensitivityZ;
+    m_config.limitX = read.limitX;
+    m_config.limitY = read.limitY;
+    m_config.limitZ = read.limitZ;
+    m_config.limitZBack = read.limitZBack;
+    m_config.toggleKey = read.toggleKey;
+    m_config.togglePositionKey = read.togglePositionKey;
+    m_config.toggleYawModeKey = read.toggleYawModeKey;
+    return present;
 }
 
 bool Mod::InitializeHooks() {

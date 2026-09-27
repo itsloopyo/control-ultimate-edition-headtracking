@@ -13,3 +13,4 @@
 # redistribute are the bytes upstream wrote.
 extern/minhook/LICENSE.txt -text
 vendor/ultimate-asi-loader/LICENSE -text
+tests/config_differential/data/** -text

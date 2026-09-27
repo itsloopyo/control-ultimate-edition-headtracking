@@ -1,4 +1,4 @@
-// Unit tests for HeadTracking.ini parsing in src/core/config.cpp.
+// Unit tests for the frozen HeadTracking.ini reader in src/legacy_config/.
 //
 // The INI is the mod's file-system boundary: a hand-edited text file whose
 // numbers reach the tracking pipeline, the camera pose and a Win32 API. Every
@@ -20,14 +20,14 @@
 #endif
 #include <windows.h>
 
-#include "core/config.h"
+#include "legacy_config/legacy_config.h"
 
 #include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <string>
 
-using ControlHT::Config;
+using ControlHT::legacy::Config;
 
 static int g_failures = 0;
 
@@ -70,7 +70,7 @@ static std::string WriteTempIni(const char* body) {
 static Config LoadIni(const char* body) {
     const std::string path = WriteTempIni(body);
     Config cfg;
-    const bool opened = cfg.LoadFromFile(path);
+    const bool opened = ControlHT::legacy::Load(path, cfg);
     DeleteFileA(path.c_str());
     Check(opened, "the test INI was opened");
     return cfg;
@@ -80,7 +80,7 @@ static Config LoadIni(const char* body) {
 // zeroing anything.
 static void TestMissingFileKeepsDefaults() {
     Config cfg;
-    const bool loaded = cfg.LoadFromFile("Z:\\no\\such\\HeadTracking.ini");
+    const bool loaded = ControlHT::legacy::Load("Z:\\no\\such\\HeadTracking.ini", cfg);
     Check(!loaded, "a missing config file reports that it was not loaded");
     CheckEq(cfg.yawSensitivity, 1.0f, "missing file keeps the default sensitivity");
     CheckEq(cfg.localSmoothing, 0.0f, "missing file keeps LocalSmoothing at 0");

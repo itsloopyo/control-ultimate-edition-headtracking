@@ -31,6 +31,7 @@ set(MOD_SOURCES
     src/dllmain.cpp
     src/core/mod.cpp
     src/core/config.cpp
+    src/legacy_config/legacy_config.cpp
     src/core/hotkeys.cpp
     src/core/path_utils.cpp
     src/hooks/engine_camera_hook.cpp
@@ -98,11 +99,11 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/src)
     add_test(NAME view_slot_table COMMAND test_view_slot_table)
 
-    # HeadTracking.ini parsing: the file-system boundary. Writes real INI files
-    # to the temp directory and reads them back through the game's own reader.
+    # The frozen HeadTracking.ini reader: the file-system boundary. Writes real
+    # INI files to the temp directory and reads them back through it.
     add_executable(test_config_validation
         tests/test_config_validation.cpp
-        src/core/config.cpp)
+        src/legacy_config/legacy_config.cpp)
     set_target_properties(test_config_validation PROPERTIES
         SKIP_PRECOMPILE_HEADERS ON)
     target_include_directories(test_config_validation PRIVATE
@@ -117,4 +118,62 @@ if(BUILD_TESTING)
         SKIP_PRECOMPILE_HEADERS ON)
     target_link_libraries(test_udp_port_reclaim PRIVATE cameraunlock)
     add_test(NAME udp_port_reclaim COMMAND test_udp_port_reclaim)
+
+    # The canonical config conversion's differential test: the dev
+    # pre-release's reader (byte copies in tests/config_differential/oracle/src)
+    # and startup code against the frozen reader in src/legacy_config/. The
+    # oracle is its own library so its pch.h and constants.h never meet the
+    # mod's.
+    set(CONTROL_DIFFERENTIAL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tests/config_differential)
+    add_library(control_config_oracle STATIC ${CONTROL_DIFFERENTIAL_DIR}/oracle/oracle_reader.cpp)
+    set_target_properties(control_config_oracle PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+    target_include_directories(control_config_oracle PRIVATE ${CONTROL_DIFFERENTIAL_DIR}/oracle/src)
+    target_link_libraries(control_config_oracle PRIVATE cameraunlock)
+
+    add_executable(control_config_differential
+        ${CONTROL_DIFFERENTIAL_DIR}/differential_tests.cpp
+        src/legacy_config/legacy_config.cpp)
+    set_target_properties(control_config_differential PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+    target_include_directories(control_config_differential PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CONTROL_DIFFERENTIAL_DIR})
+    target_compile_definitions(control_config_differential PRIVATE
+        CONTROL_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(control_config_differential PRIVATE control_config_oracle cameraunlock)
+    add_test(NAME config_differential COMMAND control_config_differential)
+
+    # What the differential test compiles is pinned by hash, line endings aside:
+    # the oracle's byte copies must stay the dev build's (git show
+    # 2696dd1:src/<file>), the core sources both readers compile must hold the
+    # code the dev build was built with (core 3465659), and the frozen reader is
+    # never edited.
+    function(control_require_hash path expected)
+        file(READ "${path}" text)
+        string(REPLACE "\r" "" text "${text}")
+        string(SHA256 actual "${text}")
+        if(NOT actual STREQUAL expected)
+            message(FATAL_ERROR "${path} has changed (SHA-256 of its text ${actual}, pinned "
+                                "${expected}). The config differential test compares against "
+                                "exactly this file; see CMakeLists.txt.")
+        endif()
+    endfunction()
+    set(CONTROL_CORE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/cameraunlock-core/cpp)
+    foreach(pinned
+            "${CONTROL_DIFFERENTIAL_DIR}/oracle/src/core/config.cpp|0ff027e545449241b968d216145d24776c1b737139b1b7e5fa7abada8cc67a9c"
+            "${CONTROL_DIFFERENTIAL_DIR}/oracle/src/core/config.h|e35ce7f726f4f9361398f34c2a5df70ff5748dc2b9acefffb578110ea804944e"
+            "${CONTROL_DIFFERENTIAL_DIR}/oracle/src/core/logging.h|5019755c9aa7abc09621f4f16c97abaafff0c6248dab7838d75492cc16447bc6"
+            "${CONTROL_DIFFERENTIAL_DIR}/oracle/src/core/constants.h|b819d0fec476e18b23e720c5173a8c37773d1b7d3506fe5665207a1769a7c6d2"
+            "${CONTROL_DIFFERENTIAL_DIR}/oracle/src/pch.h|fef0bfb1cf12f6b2fbd1b7b9448cf8d57e3c9cf9e8360c832b3942f929eb5046"
+            "${CONTROL_CORE_DIR}/include/cameraunlock/config/ini_reader.h|a7ffb44210ff59672fa97e8e5feaa2cb3e81938fcc0334a384c68bc371b3857a"
+            "${CONTROL_CORE_DIR}/src/config/ini_reader.cpp|e01515c2656aaf533bae4350dc45b702c3e3d4043935743dcc9bd5ea581fbe1c"
+            "${CONTROL_CORE_DIR}/include/cameraunlock/logging/file_log.h|43bdd2ef8554c78e5f440333463750c13b95110fe672b0b6e273244df9e7d169"
+            "${CONTROL_CORE_DIR}/src/logging/file_log.cpp|73c53c2baa06bbfebe8211f62678aa2b60cb95f604743d3686951ba56b87ea47"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/legacy_config/legacy_config.h|cecb2592f111031c5b9e4a648e84370d52ff2661d6ae13ffd617ac811d09d8f3"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/legacy_config/legacy_config.cpp|3e71f63f2729f88f20f9f0c9c2c035d0e9cd94e4c168d569275d1ba9eae415ee")
+        string(REPLACE "|" ";" pair "${pinned}")
+        list(GET pair 0 pinned_path)
+        list(GET pair 1 pinned_hash)
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${pinned_path}")
+        control_require_hash("${pinned_path}" "${pinned_hash}")
+    endforeach()
 endif()

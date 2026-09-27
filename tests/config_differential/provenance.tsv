@@ -1,0 +1,28 @@
+# What the differential test compares, and where each file came from.
+# Columns: role, source (commit:path, or the path in this repo), sha256 of the text with CR removed.
+# The rolling dev pre-release (0.0.0-nightly.20260820.2696dd1, commit 2696dd1, core pin 3465659) is
+# the only published build: no v* release was published, and no predecessor repo shipped this mod.
+# No release ZIP or launcher manifest shipped or seeded a HeadTracking.ini: every player's file is
+# the one Config::SaveDefaultIfMissing wrote on the first run, edited or not.
+# The reader was frozen at 6efc755, whose src/core/config.cpp is 2696dd1's byte for byte. Every core
+# source either reader compiles holds the same bytes at 3465659 and at 6efc755's pin (ba57f84).
+# One startup change sits between the two builds: 71f6cda made ApplyConfigToSession set the
+# downward lean limit from LimitY, where 2696dd1 left it at 0.20. Comparison 1 finds that
+# difference and no other.
+published reader	2696dd1:src/core/config.cpp, compiled as tests/config_differential/oracle/src/core/config.cpp	0ff027e545449241b968d216145d24776c1b737139b1b7e5fa7abada8cc67a9c
+published reader	2696dd1:src/core/config.h, compiled as tests/config_differential/oracle/src/core/config.h	e35ce7f726f4f9361398f34c2a5df70ff5748dc2b9acefffb578110ea804944e
+published reader	2696dd1:src/core/logging.h, compiled as tests/config_differential/oracle/src/core/logging.h	5019755c9aa7abc09621f4f16c97abaafff0c6248dab7838d75492cc16447bc6
+published reader	2696dd1:src/core/constants.h, compiled as tests/config_differential/oracle/src/core/constants.h	b819d0fec476e18b23e720c5173a8c37773d1b7d3506fe5665207a1769a7c6d2
+published reader	2696dd1:src/pch.h, compiled as tests/config_differential/oracle/src/pch.h	fef0bfb1cf12f6b2fbd1b7b9448cf8d57e3c9cf9e8360c832b3942f929eb5046
+published startup	2696dd1:src/core/mod.cpp, transcribed in tests/config_differential/oracle/oracle_reader.cpp	6c0f6dd7435885e555376414efafa885b593fd9c4e8eb1edd56cff13adf39d95
+published startup	2696dd1:src/core/hotkeys.cpp, transcribed in tests/config_differential/oracle/oracle_reader.cpp	947c4db71bf648d0ce40444695eff141f38ff4a8437fbde13470617a0130e3fd
+published core source	cameraunlock-core 3465659:cpp/include/cameraunlock/config/ini_reader.h	a7ffb44210ff59672fa97e8e5feaa2cb3e81938fcc0334a384c68bc371b3857a
+published core source	cameraunlock-core 3465659:cpp/src/config/ini_reader.cpp	e01515c2656aaf533bae4350dc45b702c3e3d4043935743dcc9bd5ea581fbe1c
+published core source	cameraunlock-core 3465659:cpp/include/cameraunlock/logging/file_log.h	43bdd2ef8554c78e5f440333463750c13b95110fe672b0b6e273244df9e7d169
+published core source	cameraunlock-core 3465659:cpp/src/logging/file_log.cpp	73c53c2baa06bbfebe8211f62678aa2b60cb95f604743d3686951ba56b87ea47
+published core source	cameraunlock-core 3465659:cpp/include/cameraunlock/data/position_settings.h, limit_y_down's default 0.20, transcribed in tests/config_differential/oracle/oracle_reader.cpp	ccd022e0f63bfe6cde243f2769b803bfa7d0ead6f77118874fa6c57961021a89
+frozen from	6efc755:src/core/config.cpp	0ff027e545449241b968d216145d24776c1b737139b1b7e5fa7abada8cc67a9c
+frozen from	6efc755:src/core/config.h	fc56810cbde4213ab4d4c5e7f482704de3fe5b1d9f72761c031f621925314f06
+frozen reader	src/legacy_config/legacy_config.h	cecb2592f111031c5b9e4a648e84370d52ff2661d6ae13ffd617ac811d09d8f3
+frozen reader	src/legacy_config/legacy_config.cpp	3e71f63f2729f88f20f9f0c9c2c035d0e9cd94e4c168d569275d1ba9eae415ee
+input	the file 2696dd1's Config::SaveDefaultIfMissing writes (IniWriter, CRLF), tests/config_differential/data/first-run-dev-2696dd1.ini; the test checks the oracle still writes these bytes	860cf74371ef01a30d1badf45f629267e5fd5fded370f68bf127f9166c4dcf76
