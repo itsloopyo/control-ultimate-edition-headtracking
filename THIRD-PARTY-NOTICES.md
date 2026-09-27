@@ -15,7 +15,7 @@ Control: Ultimate Edition.
 | injector | `f7fd18f` (inside Ultimate ASI Loader v9.7.2) | zlib | Compiled into the vendored dinput8.dll |
 | miniz | 3.0.0 (inside Ultimate ASI Loader v9.7.2) | MIT | Compiled into the vendored dinput8.dll |
 | MinHook | v1.3.4 | BSD-2-Clause | Compiled into `ControlHeadTracking.asi` |
-| cameraunlock-core | 6e57f7c64983903ab4fe49b006af59143bb52f55 | MIT | Compiled into `ControlHeadTracking.asi` |
+| cameraunlock-core | ba57f8488cf98be2148f4f6640125c5d1e5fb3ca | MIT | Compiled into `ControlHeadTracking.asi` |
 | OpenTrack | n/a | ISC | Not bundled; UDP protocol interoperability only |
 
 ---
@@ -256,7 +256,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 Git submodule at `cameraunlock-core/`, compiled into `ControlHeadTracking.asi`. Our own code,
 MIT licensed, reproduced here so the notices are complete.
 
-- Pinned commit: `6e57f7c64983903ab4fe49b006af59143bb52f55`
+- Pinned commit: `ba57f8488cf98be2148f4f6640125c5d1e5fb3ca`
 
 ```
 MIT License
