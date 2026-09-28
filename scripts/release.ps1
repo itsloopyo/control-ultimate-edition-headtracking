@@ -28,22 +28,6 @@ if ($LASTEXITCODE -ne 0) {
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Import-Module (Join-Path $ProjectRoot "cameraunlock-core\powershell\ReleaseWorkflow.psm1") -Force
 
-# Mirrors New-ChangelogFromCommits' insertion so a -Force maintenance entry
-# lands in the same place with the same shape.
-function Add-MaintenanceChangelogEntry {
-    param([string]$Path, [string]$NewVersion)
-    $date = Get-Date -Format 'yyyy-MM-dd'
-    $entry = "## [$NewVersion] - $date`n`n### Changed`n`n- Maintenance release (no user-facing changes).`n`n"
-    $changelog = Get-Content $Path -Raw
-    if ($changelog -match '(?s)(# Changelog.*?)(## \[)') {
-        $changelog = $changelog -replace '(?s)(# Changelog.*?\n\n)', "`$1$entry"
-    } else {
-        $changelog = $changelog -replace '(?s)(# Changelog.*?\n)', "`$1$entry"
-    }
-    $changelog = $changelog.TrimEnd() + "`n"
-    Set-Content $Path $changelog -NoNewline
-}
-
 if (-not $Version) {
     Write-Error "Usage: pixi run release <major|minor|patch|nightly|X.Y.Z>"
     exit 1
@@ -101,25 +85,14 @@ try {
 # any version files - a failure here then leaves a clean tree instead of
 # stranding a half-applied version bump with no tag.
 Write-Host "Generating CHANGELOG entry..." -ForegroundColor Cyan
-$hasExistingTags = git tag -l 2>$null
-if (-not $hasExistingTags) {
-    if (-not (Test-Path $changelogFile)) {
-        $date = Get-Date -Format 'yyyy-MM-dd'
-        "# Changelog`n`n## [$Version] - $date`n`nFirst release.`n" | Set-Content $changelogFile
-        Write-Host "  Wrote initial CHANGELOG.md" -ForegroundColor Gray
+try {
+    $null = New-ChangelogFromCommits -ChangelogPath $changelogFile -Version $Version -Maintenance:$Force
+} catch {
+    Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
+    if (-not $Force) {
+        Write-Host "No user-facing changes to release. Re-run with -Force for a maintenance release." -ForegroundColor Yellow
     }
-} else {
-    try {
-        $null = New-ChangelogFromCommits -ChangelogPath $changelogFile -Version $Version
-    } catch {
-        if (-not $Force) {
-            Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
-            Write-Host "No user-facing changes to release. Re-run with -Force for a maintenance release." -ForegroundColor Yellow
-            exit 1
-        }
-        Write-Host "No user-facing commits since last tag - writing maintenance entry (-Force)." -ForegroundColor Yellow
-        Add-MaintenanceChangelogEntry -Path $changelogFile -NewVersion $Version
-    }
+    exit 1
 }
 
 $content = Get-Content $constantsFile -Raw
