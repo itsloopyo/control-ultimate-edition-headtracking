@@ -86,7 +86,9 @@ try {
 # stranding a half-applied version bump with no tag.
 Write-Host "Generating CHANGELOG entry..." -ForegroundColor Cyan
 try {
-    $null = New-ChangelogFromCommits -ChangelogPath $changelogFile -Version $Version -Maintenance:$Force
+    $null = New-ChangelogFromCommits -ChangelogPath $changelogFile -Version $Version `
+        -ArtifactPaths @('src/', 'cameraunlock-core/', 'scripts/install.cmd', 'scripts/uninstall.cmd') `
+        -Maintenance:$Force
 } catch {
     Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
     if (-not $Force) {
