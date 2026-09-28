@@ -46,8 +46,11 @@ check-fingerprint = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/ch
 # reader's tests, the config differential test, which holds that reader to the
 # dev pre-release's and the migration into CameraUnlock.ini to that reader, and
 # core's canonical config lint over every file that test migrated (run with
-# node). Needs no game install.
-test = { cmd = "ctest --test-dir build -C Release --output-on-failure", depends-on = ["build"] }
+# node). Needs no game install. test-differential is the differential test and
+# the lint; test-unit is the rest.
+test-unit = { cmd = "ctest --test-dir build -C Release --output-on-failure -LE differential", depends-on = ["build"] }
+test-differential = { cmd = "ctest --test-dir build -C Release --output-on-failure --no-tests=error -L differential", depends-on = ["build"] }
+test = { depends-on = ["test-unit", "test-differential"] }
 
 # Rewrites CameraUnlock.ini, the committed config, from the config table after a
 # change to a row, a comment or a default, then the launcher manifest's config
@@ -55,8 +58,8 @@ test = { cmd = "ctest --test-dir build -C Release --output-on-failure", depends-
 render-config = { cmd = "build/Release/test_config.exe --render-config CameraUnlock.ini && node cameraunlock-core/scripts/encode-seed.mjs", depends-on = ["build"] }
 
 # Build, test and package the installer ZIP (read by CI and release.ps1). Gated
-# on `test`, so a release never ships without the behaviour locks.
-package = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/package-release.ps1", depends-on = ["test"] }
+# on `test-unit`, so a release never ships without the behaviour locks.
+package = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/package-release.ps1", depends-on = ["test-unit"] }
 
 # Checks the newest release/*-installer.zip's launcher-manifest.json against the
 # files in the ZIP, and that it carries neither CameraUnlock.ini nor
